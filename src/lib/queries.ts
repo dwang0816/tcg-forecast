@@ -48,7 +48,9 @@ export interface ValuableRow {
   // eBay fields intentionally omitted until a sold-data source is wired.
 }
 
-// Drizzle's neon-http driver returns results on `.rows`.
+// node-postgres returns a QueryResult, which carries the rows on `.rows`. This
+// is why db/index.ts uses node-postgres and not postgres.js — that driver returns
+// a bare array, so every caller here would quietly get [] instead of throwing.
 function rowsOf<T>(res: unknown): T[] {
   const r = res as { rows?: T[] };
   return (Array.isArray(res) ? (res as T[]) : r.rows) ?? [];

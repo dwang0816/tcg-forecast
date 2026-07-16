@@ -38,9 +38,9 @@ export function getDb(): NodePgDatabase<typeof schema> {
     );
   }
 
-  // Managed Postgres (Railway, Neon) terminates TLS at a proxy whose certificate
-  // won't chain to a local root store, so verification is off — the connection is
-  // still encrypted. A local server gets no TLS at all.
+  // Railway terminates TLS at a proxy whose certificate won't chain to a local
+  // root store, so verification is off — the connection is still encrypted. A
+  // local server gets no TLS at all.
   const isLocal = /@(localhost|127\.0\.0\.1)/.test(connectionString);
 
   // Strip libpq SSL params and let the explicit `ssl` option below be the single

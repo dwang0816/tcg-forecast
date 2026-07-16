@@ -19,8 +19,9 @@ export async function GET() {
   const cronSecretSet = Boolean(process.env.CRON_SECRET);
 
   // Report WHICH database we're on, by host only — never the credentials.
-  // "Is it set?" was the wrong question during the Neon->Railway move; "which one
-  // is it actually talking to?" is the one that catches a half-done cutover.
+  // "Is DATABASE_URL set?" is nearly useless on its own: it's true both when the
+  // app is wired up correctly and when it's pointed at the wrong database. The
+  // host is what tells the two apart.
   let dbHost: string | null = null;
   try {
     dbHost = url ? new URL(url).host : null;

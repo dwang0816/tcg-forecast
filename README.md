@@ -11,22 +11,23 @@ trading cards.
 Singles vs. sealed products are separated automatically at ingest time (singles
 carry a card rarity/number; sealed products don't).
 
-Built with Next.js (App Router) + Drizzle + Neon Postgres, deployed on Vercel.
+Built with Next.js (App Router) + Drizzle + Railway Postgres, deployed on Vercel.
 
 ---
 
 ## How it works
 
 ```
-GitHub Actions (daily 21:00 UTC)
+GitHub Actions (6x daily, 20:00–01:00 UTC)
         │  curl /api/ingest?game=… (one call per game)
+        │  Only the run that finds new data pulls; the rest skip.
         ▼
 /api/ingest ──fetch──► tcgcsv.com (TCGplayer catalog + prices)
         │
         ▼
-Neon Postgres
+Railway Postgres
   cards            — one row per TCGplayer product (card metadata)
-  price_snapshots  — one row per (product, subtype, day)
+  price_snapshots  — one row per (product, subtype, day), back to 2024-07
         │
         ▼
 Next.js pages  /  ·  /pokemon  ·  /onepiece  ·  /riftbound  ·  /products
@@ -62,19 +63,26 @@ Requires Node 18+.
    npm install
    ```
 
-2. **Create a Neon database** at <https://console.neon.tech> and copy the
-   **pooled** connection string.
+2. **Create a Postgres database** on Railway (<https://railway.app> → New →
+   Database → Add PostgreSQL). From the Postgres service → **Variables**, copy
+   **`DATABASE_PUBLIC_URL`** — *not* `DATABASE_URL`, which is a private
+   `*.railway.internal` host that only resolves inside Railway's network.
 
 3. **Create `.env.local`** (copy from `.env.example`):
    ```bash
-   DATABASE_URL="postgresql://…-pooler.…neon.tech/neondb?sslmode=require"
+   DATABASE_URL="postgresql://postgres:…@….proxy.rlwy.net:12345/railway"
    CRON_SECRET="$(openssl rand -hex 32)"
    ```
 
-4. **Create the tables** (pushes the schema straight to Neon):
+4. **Create the tables**:
    ```bash
-   npm run db:push
+   npm run schema
    ```
+   Use this, not `drizzle-kit push`. The `search_text` column is a generated
+   column and its trigram indexes can't be expressed in `src/db/schema.ts`, so
+   pushing from the Drizzle schema builds a database where search silently
+   returns nothing. `scripts/schema.sql` is the source of truth — keep it in
+   sync by hand when `schema.ts` changes.
 
 5. **Pull the first day of prices**:
    ```bash
@@ -101,11 +109,12 @@ Requires Node 18+.
 
 3. **Add environment variables** in Vercel (Project → Settings → Environment
    Variables), for all environments:
-   - `DATABASE_URL` — your Neon pooled connection string
+   - `DATABASE_URL` — Railway's `DATABASE_PUBLIC_URL`
    - `CRON_SECRET` — the same random value you generated locally
 
-   Tip: the **Neon integration** on the Vercel Marketplace sets `DATABASE_URL`
-   for you automatically.
+   Avoid the Vercel Marketplace database integrations here: they take ownership
+   of `DATABASE_URL` and the dashboard won't let you edit it, so pointing the app
+   at your own database means detaching the integration first.
 
 4. **Create the tables on the production DB** (once). Easiest from your machine
    with the production `DATABASE_URL` in `.env.local`:
