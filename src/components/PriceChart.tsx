@@ -183,25 +183,57 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-        {series.length > 1 &&
-          series.map((s, i) => (
-            <span key={s.label} className="flex items-center gap-1.5 text-white/60">
-              <span
-                className="h-0.5 w-4 rounded-full"
-                style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }}
-              />
-              {s.label}
-            </span>
-          ))}
+      {/* Plain-language key. The old one-line legend didn't land — the first
+          person to see this chart asked "what's the blue in the background?",
+          which is the whole point of it. Say what each mark MEANS, not what it
+          is called. */}
+      <div className="flex flex-col gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-xs">
+        <span className="flex items-start gap-2 text-white/60">
+          <span
+            aria-hidden
+            className="mt-1.5 h-0.5 w-4 shrink-0 rounded-full"
+            style={{ background: SERIES_COLORS[0] }}
+          />
+          <span>
+            <strong className="font-semibold text-white/80">The line</strong> is
+            what people <em>paid</em> — it only moves when a copy actually sells.
+          </span>
+        </span>
         {hasBand && (
-          <span className="flex items-center gap-1.5 text-white/45">
+          <span className="flex items-start gap-2 text-white/60">
             <span
-              className="h-2.5 w-4 rounded-sm"
-              style={{ background: SERIES_COLORS[0], opacity: 0.18 }}
+              aria-hidden
+              className="mt-1 h-2.5 w-4 shrink-0 rounded-sm"
+              style={{ background: SERIES_COLORS[0], opacity: 0.22 }}
             />
-            asking range{series.length > 1 ? ` (${primary.label})` : ""} — cheapest to
-            priciest copy listed
+            <span>
+              <strong className="font-semibold text-white/80">The shaded band</strong>{" "}
+              is what sellers are <em>asking</em>
+              {series.length > 1 ? ` (${primary.label})` : ""} — top edge is the
+              priciest copy listed, bottom edge the cheapest. Above the line means
+              sellers want more than the last sale.
+            </span>
+          </span>
+        )}
+        {series.length > 1 && (
+          <span className="flex flex-wrap items-center gap-3 pt-0.5 text-white/45">
+            {series.map((s, i) => (
+              <span key={s.label} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="h-0.5 w-4 rounded-full"
+                  style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }}
+                />
+                {s.label}
+              </span>
+            ))}
+          </span>
+        )}
+        {hasBand && (
+          <span className="pt-0.5 text-[11px] leading-snug text-white/35">
+            The cheapest copy isn&apos;t always a fair comparison — TCGplayer&apos;s
+            low price counts every condition, so the band&apos;s bottom edge can be a
+            damaged card.
           </span>
         )}
       </div>
