@@ -49,6 +49,16 @@ export const cards = pgTable(
     isSingle: boolean("is_single").notNull().default(false),
     // true = valuable enough to snapshot prices for (see lib/tracking.ts)
     tracked: boolean("tracked").notNull().default(true),
+    // Current prices for EVERY card, refreshed each ingest — not just tracked
+    // ones. Daily *history* stays limited to tracked cards (that's the big
+    // table), but search needs a price for all 71k, and these cost nothing:
+    // the ingest already downloads them, we were just discarding the cheap ones.
+    // Taken from the product's highest-value printing.
+    marketPrice: doublePrecision("market_price"),
+    listingPrice: doublePrecision("listing_price"),
+    lowPrice: doublePrecision("low_price"),
+    highPrice: doublePrecision("high_price"),
+    priceDate: date("price_date"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [

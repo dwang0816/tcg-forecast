@@ -335,3 +335,79 @@ export async function getCardHistory(productId: number): Promise<HistoryPoint[]>
   `);
   return rowsOf<HistoryPoint>(res);
 }
+
+export interface SearchResult extends ValuableRow {
+  tracked: boolean;
+}
+
+/**
+ * Search the whole catalog — all ~71k cards, not just the tracked ones.
+ *
+ * Every card carries a current price (stamped on the card row each ingest), so
+ * results are never dead ends. `tracked` tells the UI whether we also hold daily
+ * history (and therefore a chart) for it.
+ *
+ * Matches on name (trigram-indexed) or exact card number, e.g. "OP01-024".
+ */
+export async function searchCards({
+  q,
+  game,
+  language,
+  kind,
+  limit = 60,
+  offset = 0,
+}: {
+  q: string;
+  game?: GameSlug;
+  language?: Language;
+  kind?: Kind;
+  limit?: number;
+  offset?: number;
+}): Promise<{ rows: SearchResult[]; total: number }> {
+  const db = getDb();
+  const term = q.trim();
+  if (!term) return { rows: [], total: 0 };
+
+  const like = `%${term}%`;
+  const exact = term.toUpperCase();
+  const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
+  const langFilter = language ? sql`AND c.language = ${language}` : sql``;
+  const kindFilter =
+    kind ? sql`AND c.is_single = ${kind === "single"}` : sql``;
+
+  const where = sql`
+    WHERE (c.name ILIKE ${like} OR upper(c.number) = ${exact})
+    ${gameFilter} ${langFilter} ${kindFilter}`;
+
+  const countRes = await db.execute(sql`
+    SELECT count(*)::int AS n FROM cards c ${where}`);
+  const total = rowsOf<{ n: number }>(countRes)[0]?.n ?? 0;
+
+  const res = await db.execute(sql`
+    SELECT
+      c.game            AS "game",
+      c.product_id      AS "productId",
+      c.name            AS "name",
+      c.group_name      AS "groupName",
+      c.image_url       AS "imageUrl",
+      c.alt_image_urls  AS "altImageUrls",
+      c.url             AS "url",
+      c.rarity          AS "rarity",
+      c.number          AS "number",
+      'Normal'          AS "subTypeName",
+      c.market_price    AS "marketPrice",
+      c.listing_price   AS "listingPrice",
+      c.low_price       AS "lowPrice",
+      c.high_price      AS "highPrice",
+      c.tracked         AS "tracked"
+    FROM cards c
+    ${where}
+    ORDER BY
+      (upper(c.number) = ${exact}) DESC,     -- exact card code first
+      COALESCE(c.market_price, c.listing_price) DESC NULLS LAST,
+      c.name ASC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+
+  return { rows: rowsOf<SearchResult>(res), total };
+}

@@ -11,7 +11,7 @@ import { ValuableRow } from "@/lib/queries";
  * and average-listing prices, with labeled eBay slots reserved for when a
  * sold-data source is wired in.
  */
-export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
+export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
   const game = isGameSlug(row.game) ? GAME_BY_SLUG[row.game] : null;
   const sources = cardImageSources({
     game: row.game,
@@ -27,9 +27,11 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
         <CardImage sources={sources} alt={row.name} />
-        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white/80 backdrop-blur">
-          #{rank}
-        </span>
+        {rank != null && (
+          <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white/80 backdrop-blur">
+            #{rank}
+          </span>
+        )}
         {row.subTypeName && row.subTypeName !== "Normal" && (
           <span className="absolute right-2 top-2 rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">
             {row.subTypeName}

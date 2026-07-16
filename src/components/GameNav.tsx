@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GAMES } from "@/lib/games";
+import { SearchBox } from "@/components/SearchBox";
 
 export function GameNav() {
   const pathname = usePathname();
@@ -22,7 +23,7 @@ export function GameNav() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex flex-1 items-center gap-1 overflow-x-auto">
           {links.slice(1).map((link) => {
             const active = pathname === link.href;
             return (
@@ -39,6 +40,10 @@ export function GameNav() {
               </Link>
             );
           })}
+        </div>
+
+        <div className="ml-auto hidden shrink-0 sm:block">
+          <SearchBox compact />
         </div>
       </nav>
     </header>

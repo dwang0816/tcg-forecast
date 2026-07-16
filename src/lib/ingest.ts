@@ -73,8 +73,13 @@ export async function ingestGame(
 
   const cardRows: NewCard[] = [];
   const snapRows: NewPriceSnapshot[] = [];
-  // Best (highest) sane price seen per product, across its price subtypes.
+  // Best (highest) sane price seen per product, across its price subtypes —
+  // plus the row it came from, so every card can carry a current price.
   const saneByProduct = new Map<number, number>();
+  const bestRowByProduct = new Map<
+    number,
+    { market: number | null; listing: number | null; low: number | null; high: number | null }
+  >();
 
   await mapPool(groups, 4, async (group) => {
     const [products, prices] = await Promise.all([
@@ -123,7 +128,15 @@ export async function ingestGame(
       const sp = sanePrice(pr);
       if (sp != null) {
         const prev = saneByProduct.get(pr.productId);
-        if (prev == null || sp > prev) saneByProduct.set(pr.productId, sp);
+        if (prev == null || sp > prev) {
+          saneByProduct.set(pr.productId, sp);
+          bestRowByProduct.set(pr.productId, {
+            market: pr.marketPrice,
+            listing: pr.midPrice ?? pr.lowPrice ?? pr.highPrice,
+            low: pr.lowPrice,
+            high: pr.highPrice,
+          });
+        }
       }
 
       snapRows.push({
@@ -149,6 +162,16 @@ export async function ingestGame(
     });
     c.tracked = keep;
     if (keep) trackedIds.add(c.productId);
+
+    // Current price on EVERY card, so search can show one for all 71k.
+    const best = bestRowByProduct.get(c.productId);
+    if (best) {
+      c.marketPrice = best.market;
+      c.listingPrice = best.listing;
+      c.lowPrice = best.low;
+      c.highPrice = best.high;
+      c.priceDate = snapshotDate;
+    }
   }
 
   // Fallback images: printings related to this card that have an image, tried
@@ -200,6 +223,11 @@ export async function ingestGame(
           altImageUrls: sql`excluded.alt_image_urls`,
           isSingle: sql`excluded.is_single`,
           tracked: sql`excluded.tracked`,
+          marketPrice: sql`excluded.market_price`,
+          listingPrice: sql`excluded.listing_price`,
+          lowPrice: sql`excluded.low_price`,
+          highPrice: sql`excluded.high_price`,
+          priceDate: sql`excluded.price_date`,
           updatedAt: sql`now()`,
         },
       });
