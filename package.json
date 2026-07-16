@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "backfill": "tsx scripts/backfill.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

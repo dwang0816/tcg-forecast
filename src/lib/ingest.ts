@@ -6,6 +6,7 @@ import {
   getGroups,
   getProducts,
   getPrices,
+  getLastUpdated,
   extractExtended,
   mapPool,
 } from "./tcgcsv";
@@ -51,8 +52,14 @@ export function classifyIsSingle(
  * `date`. Safe to re-run: cards are upserted, snapshots are inserted once per
  * (product, subtype, date).
  */
-export async function ingestGame(game: Game, date = utcDate()): Promise<IngestResult> {
+export async function ingestGame(game: Game, date?: string): Promise<IngestResult> {
   const db = getDb();
+  // Date the snapshot by when tcgcsv published the data, NOT by when we ran.
+  // We ingest 6x/day but tcgcsv refreshes once (~20:00 UTC), so runs before the
+  // refresh return the previous day's prices — stamping those with today's date
+  // would create a duplicate phantom day and break movers. Fall back to our own
+  // UTC date only if tcgcsv doesn't tell us.
+  const snapshotDate = date ?? (await getLastUpdated()) ?? utcDate();
   const groups = await getGroups(game.categoryId);
 
   const cardRows: NewCard[] = [];
@@ -107,7 +114,7 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
       snapRows.push({
         productId: pr.productId,
         subTypeName: pr.subTypeName || "Normal",
-        date,
+        date: snapshotDate,
         marketPrice: pr.marketPrice,
         lowPrice: pr.lowPrice,
         midPrice: pr.midPrice,
@@ -208,7 +215,7 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
 
   return {
     game: game.slug,
-    date,
+    date: snapshotDate,
     groups: groups.length,
     cards: cardRows.length,
     tracked: trackedIds.size,

@@ -66,6 +66,33 @@ async function getJson<T>(path: string, attempt = 0): Promise<T[]> {
   return body.results;
 }
 
+/**
+ * The date tcgcsv's current data was published (UTC, "YYYY-MM-DD").
+ *
+ * This matters more than it looks. tcgcsv refreshes once a day around 20:00 UTC,
+ * and we ingest 6x/day — so an ingest that runs before the refresh returns
+ * YESTERDAY's prices. Stamping those with today's date creates a phantom day
+ * that is a byte-for-byte copy of the real one, which silently breaks every
+ * price-movement calculation (you end up diffing a day against itself).
+ * Dating snapshots by the data's own publish date also lines the live ingest up
+ * exactly with the archive dates used by scripts/backfill.ts.
+ */
+export async function getLastUpdated(): Promise<string | null> {
+  try {
+    const res = await fetch("https://tcgcsv.com/last-updated.txt", {
+      headers: { "User-Agent": USER_AGENT },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const text = (await res.text()).trim(); // e.g. 2026-07-15T20:05:27+0000
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
 export function getGroups(categoryId: number) {
   return getJson<TcgGroup>(`/${categoryId}/groups`);
 }
