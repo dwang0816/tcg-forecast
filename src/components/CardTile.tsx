@@ -2,6 +2,7 @@ import { money, percent, signedMoney } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 
 export interface CardTileProps {
   rank: number;
@@ -15,6 +16,9 @@ export interface CardTileProps {
   number: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
+  /** Listing spread, for the confidence badge. */
+  lowPrice?: number | null;
+  highPrice?: number | null;
   /** "listing" marks an asking-price fallback (no confirmed TCGplayer market). */
   priceType?: "market" | "listing";
   /** Game slug — used to source fallback images and (with showBadge) the label. */
@@ -35,6 +39,8 @@ export function CardTile({
   number,
   price,
   change,
+  lowPrice,
+  highPrice,
   priceType = "market",
   gameSlug,
   showBadge = false,
@@ -80,6 +86,11 @@ export function CardTile({
           {groupName}
           {rarity ? ` · ${rarity}` : ""}
         </div>
+        {(lowPrice != null || highPrice != null) && (
+          <div className="mt-0.5">
+            <ConfidenceBadge low={lowPrice ?? null} high={highPrice ?? null} />
+          </div>
+        )}
 
         <div className="mt-auto flex items-end justify-between pt-2">
           <span className="flex flex-col">

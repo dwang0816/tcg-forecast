@@ -32,6 +32,13 @@ export function MoversSection({
             {formatDate(rows[0].prevDate)} → {formatDate(rows[0].latestDate)}
           </span>
         )}
+        {rows.length > 0 && (
+          <p className="w-full text-xs text-white/35">
+            Ranked by price change weighted by confidence, so an erratic swing on
+            a card nobody agrees the price of can&apos;t outrank a real move on a
+            liquid one.
+          </p>
+        )}
       </div>
 
       {rows.length > 0 ? (
@@ -50,6 +57,8 @@ export function MoversSection({
               number={row.number}
               price={row.curPrice}
               change={{ pct: row.pctChange, abs: row.absChange }}
+              lowPrice={row.lowPrice}
+              highPrice={row.highPrice}
               gameSlug={row.game}
               showBadge={showGameBadge}
             />

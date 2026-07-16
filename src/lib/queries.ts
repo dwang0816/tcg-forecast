@@ -22,6 +22,9 @@ export interface MoverRow {
   latestDate: string;
   absChange: number;
   pctChange: number;
+  /** Current listing spread — drives the confidence signal (see lib/confidence.ts). */
+  lowPrice: number | null;
+  highPrice: number | null;
 }
 
 export interface ValuableRow {
@@ -39,6 +42,9 @@ export interface ValuableRow {
   marketPrice: number | null;
   /** TCGplayer average listing price (mid, then low/high), ignoring junk sentinels. */
   listingPrice: number | null;
+  /** Current listing spread — drives the confidence signal (see lib/confidence.ts). */
+  lowPrice: number | null;
+  highPrice: number | null;
   // eBay fields intentionally omitted until a sold-data source is wired.
 }
 
@@ -47,6 +53,19 @@ function rowsOf<T>(res: unknown): T[] {
   const r = res as { rows?: T[] };
   return (Array.isArray(res) ? (res as T[]) : r.rows) ?? [];
 }
+
+/**
+ * Confidence multiplier from the listing spread. Must mirror confidenceFactor()
+ * in lib/confidence.ts — that one drives the UI badge, this one drives ranking.
+ */
+const SQL_CONFIDENCE = sql`
+  CASE
+    WHEN cur.low_price IS NULL OR cur.low_price <= 0 OR cur.high_price IS NULL THEN 0.5
+    WHEN cur.high_price / cur.low_price < 2  THEN 1.0
+    WHEN cur.high_price / cur.low_price < 4  THEN 0.8
+    WHEN cur.high_price / cur.low_price < 10 THEN 0.55
+    ELSE 0.3
+  END`;
 
 /**
  * Top price movers over roughly `windowDays`.
@@ -86,7 +105,8 @@ export async function getMovers({
       FROM bounds
     ),
     cur AS (
-      SELECT ps.product_id, ps.sub_type_name, ps.market_price
+      SELECT ps.product_id, ps.sub_type_name, ps.market_price,
+             ps.low_price, ps.high_price
       FROM price_snapshots ps, tgt
       WHERE ps.date = tgt.latest AND ps.market_price IS NOT NULL
     ),
@@ -109,6 +129,8 @@ export async function getMovers({
       c.number          AS "number",
       cur.sub_type_name AS "subTypeName",
       cur.market_price  AS "curPrice",
+      cur.low_price     AS "lowPrice",
+      cur.high_price    AS "highPrice",
       prev.market_price AS "prevPrice",
       prev.date         AS "prevDate",
       (SELECT latest FROM bounds) AS "latestDate",
@@ -122,7 +144,8 @@ export async function getMovers({
       AND prev.date < (SELECT latest FROM bounds)
       AND c.is_single = ${isSingle}
       ${gameFilter}
-    ORDER BY "pctChange" ${order}
+    ORDER BY
+      ((cur.market_price - prev.market_price) / prev.market_price) * ${SQL_CONFIDENCE} ${order}
     LIMIT ${limit}
   `);
 
@@ -170,6 +193,7 @@ export async function getMostValuable({
         c.game, c.product_id, c.name, c.group_name, c.image_url, c.alt_image_urls,
         c.url, c.rarity, c.number, ps.sub_type_name,
         ps.market_price AS market,
+        ps.low_price, ps.high_price,
         COALESCE(ps.mid_price, ps.low_price, ps.high_price) AS listing
       FROM price_snapshots ps
       JOIN latest ON ps.date = latest.d
@@ -188,7 +212,9 @@ export async function getMostValuable({
       number        AS "number",
       sub_type_name AS "subTypeName",
       market        AS "marketPrice",
-      listing       AS "listingPrice"
+      listing       AS "listingPrice",
+      low_price     AS "lowPrice",
+      high_price    AS "highPrice"
     FROM rows
     ${basisFilter}
     ORDER BY ${orderCol} DESC

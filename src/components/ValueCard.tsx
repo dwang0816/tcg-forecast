@@ -2,6 +2,7 @@ import { money } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { ValuableRow } from "@/lib/queries";
 
 /**
@@ -52,6 +53,9 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
           <div className="line-clamp-1 text-xs text-white/40">
             {row.groupName}
             {row.rarity ? ` · ${row.rarity}` : ""}
+          </div>
+          <div className="mt-1.5">
+            <ConfidenceBadge low={row.lowPrice} high={row.highPrice} />
           </div>
         </div>
 
