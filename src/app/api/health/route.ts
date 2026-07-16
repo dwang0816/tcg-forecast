@@ -15,11 +15,22 @@ function rowsOf<T>(res: unknown): T[] {
  * environment and database are wired up. Fetch /api/health to see what's wrong.
  */
 export async function GET() {
-  const databaseUrlSet = Boolean(process.env.DATABASE_URL);
+  const url = process.env.DATABASE_URL;
   const cronSecretSet = Boolean(process.env.CRON_SECRET);
 
+  // Report WHICH database we're on, by host only — never the credentials.
+  // "Is it set?" was the wrong question during the Neon->Railway move; "which one
+  // is it actually talking to?" is the one that catches a half-done cutover.
+  let dbHost: string | null = null;
+  try {
+    dbHost = url ? new URL(url).host : null;
+  } catch {
+    dbHost = "unparseable";
+  }
+
   const out: Record<string, unknown> = {
-    databaseUrlSet,
+    databaseUrlSet: Boolean(url),
+    dbHost,
     cronSecretSet,
     dbConnected: false,
     tablesExist: false,
