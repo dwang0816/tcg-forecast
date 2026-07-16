@@ -1,0 +1,38 @@
+name: Daily price ingest
+
+# Triggers the deployed app's ingestion endpoint once per day, one game at a
+# time (each call stays well under Vercel's function time limit). This works on
+# Vercel's Hobby plan, which caps cron jobs at 2/day — GitHub Actions has no
+# such limit.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   INGEST_BASE_URL  e.g. https://your-app.vercel.app   (no trailing slash)
+#   CRON_SECRET      the same value set in Vercel env vars
+
+on:
+  schedule:
+    - cron: "0 21 * * *" # 21:00 UTC, just after tcgcsv's ~20:00 UTC refresh
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ingest each game
+        env:
+          BASE: ${{ secrets.INGEST_BASE_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          for game in pokemon onepiece riftbound; do
+            echo "::group::Ingesting $game"
+            code=$(curl -sS --max-time 300 -o /tmp/out.json -w "%{http_code}" \
+              -H "Authorization: Bearer $SECRET" \
+              "$BASE/api/ingest?game=$game")
+            cat /tmp/out.json; echo
+            echo "::endgroup::"
+            if [ "$code" != "200" ]; then
+              echo "Ingest for $game failed with HTTP $code"
+              exit 1
+            fi
+          done

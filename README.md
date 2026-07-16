@@ -1,0 +1,162 @@
+# TCG Forecast 📈
+
+Daily price-movement tracker for **Pokémon**, **One Piece**, and **Riftbound**
+trading cards. It records the market price of every card once a day and surfaces
+the **biggest gainers and losers** over 24 hours, 7 days, and 30 days — plus a
+**Most Valuable** list.
+
+Built with Next.js (App Router) + Drizzle + Neon Postgres, deployed on Vercel.
+
+---
+
+## How it works
+
+```
+GitHub Actions (daily 21:00 UTC)
+        │  curl /api/ingest?game=… (one call per game)
+        ▼
+/api/ingest ──fetch──► tcgcsv.com (TCGplayer catalog + prices)
+        │
+        ▼
+Neon Postgres
+  cards            — one row per TCGplayer product (card metadata)
+  price_snapshots  — one row per (product, subtype, day)
+        │
+        ▼
+Next.js pages  /  ·  /pokemon  ·  /onepiece  ·  /riftbound
+```
+
+**Why daily?** The upstream source ([tcgcsv.com](https://tcgcsv.com), a free
+mirror of TCGplayer market prices) refreshes once per day around 20:00 UTC.
+Polling more often just returns identical numbers. Trends are computed by
+diffing today's snapshot against an earlier one, so we keep our own history.
+
+**Trends build over time.** On a brand-new database there's no history yet, so
+gainers/losers are empty until the second daily run (24 h), and the 7 d / 30 d
+windows fill in as days accumulate. The **Most Valuable** view works from the
+very first ingest. While a window is still filling, the app compares against the
+oldest snapshot it has and labels the *actual* period shown.
+
+---
+
+## Local setup
+
+Requires Node 18+.
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Create a Neon database** at <https://console.neon.tech> and copy the
+   **pooled** connection string.
+
+3. **Create `.env.local`** (copy from `.env.example`):
+   ```bash
+   DATABASE_URL="postgresql://…-pooler.…neon.tech/neondb?sslmode=require"
+   CRON_SECRET="$(openssl rand -hex 32)"
+   ```
+
+4. **Create the tables** (pushes the schema straight to Neon):
+   ```bash
+   npm run db:push
+   ```
+
+5. **Pull the first day of prices**:
+   ```bash
+   npm run ingest            # all three games
+   # or one at a time:
+   npm run ingest riftbound
+   ```
+
+6. **Run the app**:
+   ```bash
+   npm run dev
+   ```
+   Open <http://localhost:3000>. You'll see the Most Valuable list immediately;
+   run `npm run ingest` again on another day to see movers populate.
+
+---
+
+## Deploy to Vercel
+
+1. **Push this repo to GitHub.**
+
+2. **Import the repo into Vercel** (<https://vercel.com/new>). The Next.js preset
+   is auto-detected — no config needed.
+
+3. **Add environment variables** in Vercel (Project → Settings → Environment
+   Variables), for all environments:
+   - `DATABASE_URL` — your Neon pooled connection string
+   - `CRON_SECRET` — the same random value you generated locally
+
+   Tip: the **Neon integration** on the Vercel Marketplace sets `DATABASE_URL`
+   for you automatically.
+
+4. **Create the tables on the production DB** (once). Easiest from your machine
+   with the production `DATABASE_URL` in `.env.local`:
+   ```bash
+   npm run db:push
+   ```
+
+5. **Deploy.** Vercel builds and hosts it.
+
+### Scheduling the daily ingest
+
+Ingestion is triggered by **GitHub Actions** (`.github/workflows/ingest.yml`),
+which works on Vercel's free Hobby plan (whose cron is limited to 2 jobs/day)
+and calls each game separately to stay under the function time limit.
+
+Add two **repository secrets** (GitHub → Settings → Secrets and variables →
+Actions):
+- `INGEST_BASE_URL` — your deployed URL, e.g. `https://your-app.vercel.app`
+- `CRON_SECRET` — the same value as in Vercel
+
+The workflow runs daily at 21:00 UTC. You can also trigger it manually from the
+**Actions** tab (“Run workflow”) to seed data immediately after deploying.
+
+> **Alternative — Vercel Cron (Pro plan).** If you're on Vercel Pro, skip GitHub
+> Actions and add a `vercel.json` instead:
+> ```json
+> {
+>   "crons": [
+>     { "path": "/api/ingest?game=pokemon",  "schedule": "0 21 * * *" },
+>     { "path": "/api/ingest?game=onepiece", "schedule": "10 21 * * *" },
+>     { "path": "/api/ingest?game=riftbound", "schedule": "20 21 * * *" }
+>   ]
+> }
+> ```
+> Vercel Cron automatically sends the `Authorization: Bearer $CRON_SECRET`
+> header. (Hobby allows only 2 cron jobs, so the per-game split needs Pro.)
+
+---
+
+## Data model
+
+| table | key | notable columns |
+| --- | --- | --- |
+| `cards` | `product_id` | `game`, `group_name` (set), `name`, `image_url`, `url`, `rarity`, `number` |
+| `price_snapshots` | `(product_id, sub_type_name, date)` | `market_price`, `low/mid/high_price`, `direct_low_price` |
+
+`sub_type_name` distinguishes printings such as `Normal` vs `Foil`, which carry
+independent prices.
+
+## Scripts
+
+| command | what it does |
+| --- | --- |
+| `npm run dev` | start the dev server |
+| `npm run build` / `npm start` | production build / serve |
+| `npm run ingest [game]` | pull prices now (all games, or one) |
+| `npm run db:push` | create/update tables on the DB from the schema |
+| `npm run db:generate` | generate a SQL migration into `drizzle/` |
+| `npm run db:migrate` | apply generated migrations |
+| `npm run db:studio` | open Drizzle Studio to browse the data |
+
+## Data source & attribution
+
+Prices come from [tcgcsv.com](https://tcgcsv.com), a free daily mirror of
+TCGplayer's public catalog and market prices. This project is not affiliated
+with TCGplayer, The Pokémon Company, Bandai, or Riot Games. Respect tcgcsv's
+[usage guidelines](https://tcgcsv.com/docs) — the ingest client already
+identifies itself via User-Agent and stays well under the request budget.
