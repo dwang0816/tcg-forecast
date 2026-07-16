@@ -32,9 +32,11 @@ export interface Extreme {
 export interface Change {
   /** Days back this compares against; null means "the whole window we hold". */
   days: number | null;
+  /** Plain English, because "24H" and "30D" are jargon to half the readers. */
   label: string;
   pct: number | null;
   from: number | null;
+  fromDate: string | null;
 }
 
 export interface SeriesStats {
@@ -70,6 +72,14 @@ export interface SeriesStats {
 
 const pctChange = (from: number, to: number): number | null =>
   from > 0 ? (to - from) / from : null;
+
+/** Name the whole-history window by what it actually spans, not "All". */
+export function spanLabel(days: number): string {
+  if (days >= 700) return "Whole 2 years";
+  if (days >= 350) return "Whole year";
+  if (days >= 60) return `All ${Math.round(days / 30)} months`;
+  return `All ${days} days`;
+}
 
 /** Last point at or before `daysBack` days before the newest point. */
 function pointDaysBack(points: PricePoint[], daysBack: number): PricePoint | null {
@@ -167,23 +177,40 @@ export function seriesStats(label: string, points: PricePoint[]): SeriesStats {
       ? (cur - low.price) / (high.price - low.price)
       : null;
 
+  // How far back this card's history actually goes. Offering "Last year" on a
+  // card we've held for six weeks just prints a dash in a box.
+  const span =
+    priced.length > 1
+      ? Math.round(
+          (new Date(priced.at(-1)!.date).getTime() -
+            new Date(priced[0].date).getTime()) /
+            86_400_000,
+        )
+      : 0;
+
   const windows: { days: number | null; label: string }[] = [
-    { days: 1, label: "24h" },
-    { days: 7, label: "7d" },
-    { days: 30, label: "30d" },
-    { days: null, label: "All" },
+    { days: 1, label: "Since yesterday" },
+    { days: 7, label: "Last week" },
+    { days: 30, label: "Last month" },
+    { days: 90, label: "Last 3 months" },
+    { days: 365, label: "Last year" },
+    { days: null, label: spanLabel(span) },
   ];
-  const changes: Change[] = windows.map((w) => {
-    const base =
-      w.days == null ? (priced[0] ?? null) : pointDaysBack(priced, w.days);
-    const from = base?.market ?? null;
-    return {
-      days: w.days,
-      label: w.label,
-      from,
-      pct: from != null && cur != null ? pctChange(from, cur) : null,
-    };
-  });
+  const changes: Change[] = windows
+    // Keep a window only if we hold enough history to answer it honestly.
+    .filter((w) => w.days == null || w.days <= span)
+    .map((w) => {
+      const base =
+        w.days == null ? (priced[0] ?? null) : pointDaysBack(priced, w.days);
+      const from = base?.market ?? null;
+      return {
+        days: w.days,
+        label: w.label,
+        from,
+        fromDate: base?.date ?? null,
+        pct: from != null && cur != null ? pctChange(from, cur) : null,
+      };
+    });
 
   const spread =
     latest?.low != null && latest?.high != null && latest.low > 0

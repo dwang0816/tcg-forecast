@@ -1,4 +1,4 @@
-import { money, percent, formatDate } from "@/lib/format";
+import { money, percent, percentPlain, formatDate } from "@/lib/format";
 import { confidenceTier, spreadRatio, ConfidenceTier } from "@/lib/confidence";
 import type { SeriesStats } from "@/lib/cardStats";
 
@@ -28,38 +28,52 @@ const TIER_TONE: Record<ConfidenceTier, "good" | "warn" | "bad"> = {
  */
 
 /** How much history is behind these numbers, in words a reader can use. */
-function spanLabel(s: SeriesStats): string {
+function spanWords(s: SeriesStats): string {
   const ds = s.points.map((p) => p.date);
-  if (ds.length < 2) return "Range so far";
+  if (ds.length < 2) return "so far";
   const days = Math.round(
     (new Date(ds.at(-1)!).getTime() - new Date(ds[0]).getTime()) / 86_400_000,
   );
-  if (days >= 700) return "2-year range";
-  if (days >= 350) return "52-week range";
-  if (days >= 150) return `${Math.round(days / 30)}-month range`;
-  return `Range over ${days} days`;
+  if (days >= 700) return "over the past 2 years";
+  if (days >= 350) return "over the past year";
+  if (days >= 60) return `over the past ${Math.round(days / 30)} months`;
+  return `over the past ${days} days`;
 }
 
 /** Where today's price sits between the period low and high. */
 function RangeBar({ s }: { s: SeriesStats }) {
   if (!s.high || !s.low || s.rangePos == null) return null;
   const pos = Math.min(1, Math.max(0, s.rangePos));
+  const cur = s.points.filter((p) => p.market != null).at(-1)?.market ?? null;
   return (
     <div>
-      <div className="flex items-baseline justify-between text-[11px] text-white/40">
-        <span>Low · {formatDate(s.low.date)}</span>
-        <span className="text-white/50">{spanLabel(s)}</span>
-        <span>High · {formatDate(s.high.date)}</span>
+      <div className="mb-2 text-sm font-medium text-white/70">
+        Where today&apos;s price sits {spanWords(s)}
       </div>
       <div className="relative mt-1.5 h-1.5 rounded-full bg-gradient-to-r from-sky-500/25 via-white/15 to-emerald-500/30">
+        {/* The tick is the whole point of the bar, so it says what it is. */}
         <div
           className="absolute -top-1 h-3.5 w-1 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]"
           style={{ left: `${pos * 100}%` }}
         />
+        <span
+          className="absolute -top-6 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-white/80"
+          style={{ left: `${Math.min(92, Math.max(8, pos * 100))}%` }}
+        >
+          today {money(cur ?? 0)}
+        </span>
       </div>
-      <div className="mt-1.5 flex items-baseline justify-between text-xs tabular-nums">
-        <span className="text-white/70">{money(s.low.price)}</span>
-        <span className="text-white/70">{money(s.high.price)}</span>
+      <div className="mt-2 flex items-baseline justify-between text-[11px]">
+        <span className="text-white/45">
+          cheapest it&apos;s been{" "}
+          <span className="tabular-nums text-white/70">{money(s.low.price)}</span>{" "}
+          <span className="text-white/30">· {formatDate(s.low.date)}</span>
+        </span>
+        <span className="text-right text-white/45">
+          priciest it&apos;s been{" "}
+          <span className="tabular-nums text-white/70">{money(s.high.price)}</span>{" "}
+          <span className="text-white/30">· {formatDate(s.high.date)}</span>
+        </span>
       </div>
     </div>
   );
@@ -149,7 +163,7 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
                 {" "}
                 Sellers are currently asking{" "}
                 <strong className="font-semibold text-amber-200">
-                  {percent(askGap)} more
+                  {percentPlain(askGap)} more
                 </strong>{" "}
                 than that last sale — treat the asking range as the live price
                 here.
@@ -180,31 +194,33 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <div className="text-xs text-white/40">
-            Market price{s.label !== "Normal" ? ` · ${s.label}` : ""}
+            What people paid{s.label !== "Normal" ? ` · ${s.label}` : ""}
           </div>
           <div className="mt-0.5 text-3xl font-semibold tabular-nums text-white">
             {cur != null ? money(cur) : "N/A"}
           </div>
-          <div className="mt-1 text-[11px] text-white/35">
+          <div className="mt-1 text-[11px] leading-snug text-white/35">
             {cur != null
               ? s.staleDays === 0
-                ? "updated today from a real sale"
-                : `last changed ${s.staleDays} day${s.staleDays === 1 ? "" : "s"} ago`
-              : "nobody has bought one — asking price only"}
+                ? "someone bought one today at this price"
+                : `the last time anyone bought one was ${s.staleDays} day${
+                    s.staleDays === 1 ? "" : "s"
+                  } ago`
+              : "nobody has ever bought one — sellers are guessing"}
           </div>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-white/40">Asking now — cheapest to priciest</div>
+          <div className="text-xs text-white/40">What sellers want today</div>
           <div className="mt-0.5 text-2xl font-semibold tabular-nums text-white">
             {latest?.low != null && latest?.high != null
               ? `${money(latest.low)} – ${money(latest.high)}`
               : "—"}
           </div>
-          <div className="mt-1 text-[11px] text-white/35">
+          <div className="mt-1 text-[11px] leading-snug text-white/35">
             {latest?.low != null
-              ? `cheapest copy you can buy right now: ${money(latest.low)}`
-              : "no live listings"}
+              ? `you could buy one right now for ${money(latest.low)}`
+              : "nothing listed for sale right now"}
           </div>
         </div>
       </div>
@@ -224,20 +240,21 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="mb-2 text-[11px] uppercase tracking-wide text-white/35">
-          Change in market price
+        <div className="mb-1 text-sm font-medium text-white/70">
+          How the price has moved
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <p className="mb-2.5 text-[11px] text-white/35">
+          Comparing what people paid today against what they paid back then.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {s.changes.map((c) => (
             <div
               key={c.label}
               className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5"
             >
-              <div className="text-[11px] uppercase tracking-wide text-white/35">
-                {c.label}
-              </div>
+              <div className="text-[11px] leading-snug text-white/40">{c.label}</div>
               <div
-                className={`mt-0.5 text-sm font-semibold tabular-nums ${
+                className={`mt-1 text-sm font-semibold tabular-nums ${
                   c.pct == null
                     ? "text-white/30"
                     : c.pct > 0
@@ -247,11 +264,15 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
                         : "text-white/60"
                 }`}
               >
-                {c.pct == null ? "—" : c.pct === 0 ? "no change" : percent(c.pct)}
+                {c.pct == null
+                  ? "—"
+                  : c.pct === 0
+                    ? "same price"
+                    : `${c.pct > 0 ? "up" : "down"} ${percentPlain(c.pct)}`}
               </div>
               {c.from != null && (
-                <div className="mt-0.5 text-[11px] text-white/35">
-                  from {money(c.from)}
+                <div className="mt-0.5 text-[11px] leading-snug text-white/35">
+                  was {money(c.from)}
                 </div>
               )}
             </div>
@@ -261,26 +282,34 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Fact
-          label="Seller agreement"
+          label="Do sellers agree?"
           value={tier ? TIER_WORD[tier] : "—"}
           hint={
             s.spread != null
-              ? `priciest copy is ${s.spread.toFixed(1)}× the cheapest`
-              : "no live listings"
+              ? `the priciest copy costs ${s.spread.toFixed(1)}× the cheapest`
+              : "nothing listed right now"
           }
           tone={tier ? TIER_TONE[tier] : undefined}
         />
         <Fact
-          label="Day-to-day swing"
-          value={s.volatility != null ? `± ${(s.volatility * 100).toFixed(1)}%` : "—"}
+          label="Is the price steady?"
+          value={
+            s.volatility == null
+              ? "—"
+              : s.volatility < 0.02
+                ? "Steady"
+                : s.volatility < 0.08
+                  ? "Moves a bit"
+                  : "Jumpy"
+          }
           hint={
             s.volatility == null
-              ? "not enough history"
+              ? "not enough history yet"
               : s.volatility < 0.02
-                ? "steady — quotes hold up"
+                ? `moves about ${(s.volatility * 100).toFixed(1)}% a day — a quote holds up`
                 : s.volatility < 0.08
-                  ? "moves a bit day to day"
-                  : "jumpy — quote it fresh"
+                  ? `moves about ${(s.volatility * 100).toFixed(1)}% a day`
+                  : `moves about ${(s.volatility * 100).toFixed(1)}% a day — check before quoting`
           }
           tone={
             s.volatility == null
@@ -293,14 +322,14 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
           }
         />
         <Fact
-          label="Cheapest ever seen"
+          label="Lowest it's ever been"
           value={s.low ? money(s.low.price) : "—"}
-          hint={s.low ? formatDate(s.low.date) : undefined}
+          hint={s.low ? `on ${formatDate(s.low.date)}` : undefined}
         />
         <Fact
-          label="Priciest ever seen"
+          label="Highest it's ever been"
           value={s.high ? money(s.high.price) : "—"}
-          hint={s.high ? formatDate(s.high.date) : undefined}
+          hint={s.high ? `on ${formatDate(s.high.date)}` : undefined}
         />
       </div>
     </div>

@@ -4,6 +4,30 @@ import { useId, useMemo, useState } from "react";
 import { money, formatDate } from "@/lib/format";
 import { seriesStats, type SeriesStats } from "@/lib/cardStats";
 
+/** One labelled number in the hover panel. */
+function Reading({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="text-[11px] leading-none text-white/40">{label}</span>
+      <span
+        className={`leading-none tabular-nums ${
+          strong ? "font-semibold text-white" : "text-white/75"
+        }`}
+      >
+        {value}
+      </span>
+    </span>
+  );
+}
+
 const RANGES: { label: string; days: number | null }[] = [
   { label: "1M", days: 30 },
   { label: "3M", days: 90 },
@@ -482,30 +506,46 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
         </svg>
       </div>
 
+      {/* Every number gets named. The old tooltip read "$1,699.99 (asking
+          $1,500.00–$2,000.00)" and left the reader to work out which was
+          which — the same failure as the legend. */}
       {hoverDate && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-white/5 px-3 py-2 text-xs">
-          <span className="text-white/50">{formatDate(hoverDate)}</span>
-          {series.map((s, i) => {
-            const p = s.points.find((pt) => pt.date === hoverDate);
-            if (!p) return null;
-            return (
-              <span key={s.label} className="flex items-center gap-1.5">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }}
-                />
-                <span className="text-white/50">{s.label}</span>
-                <span className="font-semibold tabular-nums text-white">
-                  {p.market != null ? money(p.market) : "no sale"}
-                </span>
-                {p.low != null && p.high != null && (
-                  <span className="text-white/35">
-                    (asking {money(p.low)}–{money(p.high)})
-                  </span>
-                )}
-              </span>
-            );
-          })}
+        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+          <div className="mb-2 font-medium text-white/70">
+            {formatDate(hoverDate)}
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {series.map((s, i) => {
+              const p = s.points.find((pt) => pt.date === hoverDate);
+              if (!p) return null;
+              return (
+                <div key={s.label} className="flex flex-col gap-1.5">
+                  {series.length > 1 && (
+                    <span className="flex items-center gap-1.5 text-white/50">
+                      <span
+                        aria-hidden
+                        className="h-2 w-2 rounded-full"
+                        style={{
+                          background: SERIES_COLORS[i % SERIES_COLORS.length],
+                        }}
+                      />
+                      {s.label}
+                    </span>
+                  )}
+                  <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                    <Reading
+                      label={p.market != null ? "Someone paid" : "Nobody bought one"}
+                      value={p.market != null ? money(p.market) : "—"}
+                      strong
+                    />
+                    <Reading label="Cheapest on sale" value={money(p.low)} />
+                    <Reading label="Typical asking price" value={money(p.mid)} />
+                    <Reading label="Priciest on sale" value={money(p.high)} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
