@@ -28,11 +28,14 @@ export const cards = pgTable(
     number: text("number"),
     // true = individual card ("single"); false = sealed product (box/pack/deck)
     isSingle: boolean("is_single").notNull().default(false),
+    // true = valuable enough to snapshot prices for (see lib/tracking.ts)
+    tracked: boolean("tracked").notNull().default(true),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [
     index("cards_game_idx").on(t.game),
     index("cards_game_single_idx").on(t.game, t.isSingle),
+    index("cards_tracked_idx").on(t.tracked),
   ],
 );
 

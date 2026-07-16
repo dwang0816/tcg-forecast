@@ -19,7 +19,7 @@ async function main() {
     const result = await ingestGame(game);
     const secs = ((Date.now() - start) / 1000).toFixed(1);
     console.log(
-      `done in ${secs}s — ${result.cards} cards, ${result.snapshots} snapshots (${result.date})`,
+      `done in ${secs}s — ${result.cards} cards, ${result.tracked} tracked, ${result.snapshots} snapshots (${result.date})`,
     );
   }
 }

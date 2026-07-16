@@ -9,12 +9,14 @@ import {
   extractExtended,
   mapPool,
 } from "./tcgcsv";
+import { isTracked, sanePrice } from "./tracking";
 
 export interface IngestResult {
   game: string;
   date: string;
   groups: number;
   cards: number;
+  tracked: number;
   snapshots: number;
 }
 
@@ -55,6 +57,8 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
 
   const cardRows: NewCard[] = [];
   const snapRows: NewPriceSnapshot[] = [];
+  // Best (highest) sane price seen per product, across its price subtypes.
+  const saneByProduct = new Map<number, number>();
 
   await mapPool(groups, 4, async (group) => {
     const [products, prices] = await Promise.all([
@@ -91,6 +95,12 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
       ) {
         continue;
       }
+      const sp = sanePrice(pr);
+      if (sp != null) {
+        const prev = saneByProduct.get(pr.productId);
+        if (prev == null || sp > prev) saneByProduct.set(pr.productId, sp);
+      }
+
       snapRows.push({
         productId: pr.productId,
         subTypeName: pr.subTypeName || "Normal",
@@ -103,6 +113,18 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
       });
     }
   });
+
+  // Decide which cards are worth tracking, and keep only their snapshots.
+  const trackedIds = new Set<number>();
+  for (const c of cardRows) {
+    const keep = isTracked({
+      game: game.slug,
+      rarity: c.rarity ?? null,
+      sanePrice: saneByProduct.get(c.productId) ?? null,
+    });
+    c.tracked = keep;
+    if (keep) trackedIds.add(c.productId);
+  }
 
   // Upsert cards (metadata can change: new rarity data, renamed presale, etc.)
   for (const batch of chunk(cardRows, 500)) {
@@ -120,6 +142,7 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
           rarity: sql`excluded.rarity`,
           number: sql`excluded.number`,
           isSingle: sql`excluded.is_single`,
+          tracked: sql`excluded.tracked`,
           updatedAt: sql`now()`,
         },
       });
@@ -129,8 +152,8 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
   // GitHub Actions schedule) and tcgcsv refreshes once daily, a later run that
   // sees fresher prices overwrites the day's row. Only snapshot products we
   // actually have a card row for.
-  const knownIds = new Set(cardRows.map((c) => c.productId));
-  const validSnaps = snapRows.filter((s) => knownIds.has(s.productId));
+  // Only snapshot prices for tracked (valuable) cards.
+  const validSnaps = snapRows.filter((s) => trackedIds.has(s.productId));
   for (const batch of chunk(validSnaps, 500)) {
     await db
       .insert(priceSnapshots)
@@ -156,6 +179,7 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
     date,
     groups: groups.length,
     cards: cardRows.length,
+    tracked: trackedIds.size,
     snapshots: validSnaps.length,
   };
 }
