@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { allGameLanguages, isGameSlug, parseLanguage } from "@/lib/games";
 import { ingestGame, IngestResult } from "@/lib/ingest";
+import { PRICES_TAG } from "@/lib/cached";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,8 +62,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Browsing pages cache their reads for a day, because prices only change when
+  // this endpoint writes them. This is what actually makes new prices appear: the
+  // cache is told, rather than expiring on a timer and hoping to land after the
+  // refresh.
+  //
+  // profile "max" is stale-while-revalidate: the tag is marked stale, the next
+  // visitor is served yesterday's page instantly, and fresh data is fetched behind
+  // them. The bare revalidateTag(tag) form — now deprecated — expires immediately
+  // instead, which would hand whoever arrives first a blocking scan of 8.6M rows.
+  // Prices a few seconds stale are worth nobody ever waiting on that.
+  //
+  // Only when a run actually wrote: the five daily runs that skip must not touch
+  // the cache at all.
+  const wrote = results.some((r) => !r.skipped);
+  if (wrote) revalidateTag(PRICES_TAG, "max");
+
   return NextResponse.json(
-    { ok: errors.length === 0, results, errors },
+    { ok: errors.length === 0, revalidated: wrote, results, errors },
     { status: errors.length ? 207 : 200 },
   );
 }
