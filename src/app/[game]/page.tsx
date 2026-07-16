@@ -165,6 +165,16 @@ export default async function GamePage({
           minPrice={minPrice}
           fromDate={movers.length > 0 ? formatDate(movers[0].prevDate) : undefined}
           toDate={movers.length > 0 ? formatDate(movers[0].latestDate) : undefined}
+          example={
+            movers.length > 0
+              ? {
+                  name: movers[0].name,
+                  from: movers[0].prevPrice,
+                  to: movers[0].curPrice,
+                  pct: movers[0].pctChange,
+                }
+              : undefined
+          }
         />
       )}
 
