@@ -23,8 +23,6 @@ export interface MoverRow {
   pctChange: number;
 }
 
-export type PriceType = "market" | "listing";
-
 export interface ValuableRow {
   game: string;
   productId: number;
@@ -35,9 +33,11 @@ export interface ValuableRow {
   rarity: string | null;
   number: string | null;
   subTypeName: string;
-  curPrice: number;
-  /** "market" = TCGplayer market price; "listing" = fallback asking price (no confirmed market). */
-  priceType: PriceType;
+  /** TCGplayer market price (sales-based). Null when TCGplayer has none. */
+  marketPrice: number | null;
+  /** TCGplayer average listing price (mid, then low/high), ignoring junk sentinels. */
+  listingPrice: number | null;
+  // eBay fields intentionally omitted until a sold-data source is wired.
 }
 
 // Drizzle's neon-http driver returns results on `.rows`.
@@ -130,7 +130,7 @@ export async function getMovers({
 export async function getMostValuable({
   game,
   kind = "single",
-  limit = 24,
+  limit = 100,
 }: {
   game?: GameSlug;
   kind?: Kind;
@@ -140,42 +140,41 @@ export async function getMostValuable({
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const isSingle = kind === "single";
 
-  // When there's no market price (thin-market grails), fall back to a sane
-  // listing price: mid, then low, then high — ignoring TCGplayer's >= 99999
-  // "no data" sentinels. Such rows are tagged "listing" so the UI can label them.
+  // Return market and (sane) listing price separately so the UI can show both.
+  // Listing = mid, then low, then high, ignoring TCGplayer's >= 99999 sentinels.
+  // Rank by whichever price we have (market preferred, else listing).
   const res = await db.execute(sql`
     WITH latest AS (SELECT max(date) AS d FROM price_snapshots),
     rows AS (
       SELECT
         c.game, c.product_id, c.name, c.group_name, c.image_url, c.url,
         c.rarity, c.number, ps.sub_type_name,
+        ps.market_price AS market,
         COALESCE(
-          ps.market_price,
           (CASE WHEN ps.mid_price  < 99999 THEN ps.mid_price  END),
           (CASE WHEN ps.low_price  < 99999 THEN ps.low_price  END),
           (CASE WHEN ps.high_price < 99999 THEN ps.high_price END)
-        ) AS price,
-        (ps.market_price IS NOT NULL) AS is_market
+        ) AS listing
       FROM price_snapshots ps
       JOIN latest ON ps.date = latest.d
       JOIN cards c ON c.product_id = ps.product_id
       WHERE c.is_single = ${isSingle} ${gameFilter}
     )
     SELECT
-      game         AS "game",
-      product_id   AS "productId",
-      name         AS "name",
-      group_name   AS "groupName",
-      image_url    AS "imageUrl",
-      url          AS "url",
-      rarity       AS "rarity",
-      number       AS "number",
+      game          AS "game",
+      product_id    AS "productId",
+      name          AS "name",
+      group_name    AS "groupName",
+      image_url     AS "imageUrl",
+      url           AS "url",
+      rarity        AS "rarity",
+      number        AS "number",
       sub_type_name AS "subTypeName",
-      price        AS "curPrice",
-      CASE WHEN is_market THEN 'market' ELSE 'listing' END AS "priceType"
+      market        AS "marketPrice",
+      listing       AS "listingPrice"
     FROM rows
-    WHERE price IS NOT NULL
-    ORDER BY price DESC
+    WHERE COALESCE(market, listing) IS NOT NULL
+    ORDER BY COALESCE(market, listing) DESC
     LIMIT ${limit}
   `);
 

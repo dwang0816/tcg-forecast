@@ -1,7 +1,7 @@
 import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
-import { CardTile } from "@/components/CardTile";
+import { ValueCard } from "@/components/ValueCard";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -27,7 +27,7 @@ export default async function ProductsPage({
       getGameStats(),
       getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
       getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
-      getMostValuable({ kind: "sealed", limit: 20 }),
+      getMostValuable({ kind: "sealed", limit: 100 }),
     ]);
     return { stats, gainers, losers, valuable };
   });
@@ -86,26 +86,13 @@ export default async function ProductsPage({
 
       {valuable.length > 0 && (
         <section className="flex flex-col gap-3">
-          <div className="border-b border-white/10 pb-2">
+          <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
             <h2 className="text-lg font-semibold">★ Most Valuable Sealed</h2>
+            <span className="text-xs text-white/40">top {valuable.length}</span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {valuable.map((row, i) => (
-              <CardTile
-                key={`${row.productId}-${row.subTypeName}`}
-                rank={i + 1}
-                name={row.name}
-                groupName={row.groupName}
-                imageUrl={row.imageUrl}
-                url={row.url}
-                subTypeName={row.subTypeName}
-                rarity={row.rarity}
-                number={row.number}
-                price={row.curPrice}
-                priceType={row.priceType}
-                gameSlug={row.game}
-                showBadge
-              />
+              <ValueCard key={`${row.productId}-${row.subTypeName}`} row={row} rank={i + 1} />
             ))}
           </div>
         </section>
