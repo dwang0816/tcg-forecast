@@ -1,6 +1,7 @@
-import { getMovers, getGameStats } from "@/lib/queries";
+import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
+import { CardTile } from "@/components/CardTile";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -22,12 +23,13 @@ export default async function ProductsPage({
 
   // Sealed products across ALL games. minPrice raised — sealed rarely trades low.
   const { data, error } = await safeLoad(async () => {
-    const [stats, gainers, losers] = await Promise.all([
+    const [stats, gainers, losers, valuable] = await Promise.all([
       getGameStats(),
       getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
       getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
+      getMostValuable({ kind: "sealed", limit: 20 }),
     ]);
-    return { stats, gainers, losers };
+    return { stats, gainers, losers, valuable };
   });
 
   if (error || !data) {
@@ -41,7 +43,7 @@ export default async function ProductsPage({
     );
   }
 
-  const { stats, gainers, losers } = data;
+  const { stats, gainers, losers, valuable } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2
@@ -81,6 +83,31 @@ export default async function ProductsPage({
         showGameBadge
         emptyBody={emptyBody}
       />
+
+      {valuable.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="border-b border-white/10 pb-2">
+            <h2 className="text-lg font-semibold">★ Most Valuable Sealed</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {valuable.map((row, i) => (
+              <CardTile
+                key={`${row.productId}-${row.subTypeName}`}
+                rank={i + 1}
+                name={row.name}
+                groupName={row.groupName}
+                imageUrl={row.imageUrl}
+                url={row.url}
+                subTypeName={row.subTypeName}
+                rarity={row.rarity}
+                number={row.number}
+                price={row.curPrice}
+                gameSlug={row.game}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
