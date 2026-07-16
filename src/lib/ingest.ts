@@ -29,6 +29,21 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+// Sealed products (boxes, packs, decks, etc.) never carry a card rarity/number.
+// This keyword guard also catches the rare sealed item tagged with stray data.
+const SEALED_RE =
+  /\b(booster|box|display|case|pack|bundle|collection|tin|blister|elite trainer|build\s*&\s*battle|starter|precon|gift set|premium collection|treasure chest|deck box|sleeved|carton)\b/i;
+
+/** A product is a "single" (individual card) if it has card data and isn't sealed. */
+export function classifyIsSingle(
+  name: string,
+  rarity: string | null,
+  number: string | null,
+): boolean {
+  if (SEALED_RE.test(name)) return false;
+  return rarity != null || number != null;
+}
+
 /**
  * Ingest one game's entire catalog + current prices, writing a snapshot dated
  * `date`. Safe to re-run: cards are upserted, snapshots are inserted once per
@@ -48,6 +63,8 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
     ]);
 
     for (const p of products) {
+      const rarity = extractExtended(p, "Rarity");
+      const number = extractExtended(p, "Number");
       cardRows.push({
         productId: p.productId,
         game: game.slug,
@@ -58,8 +75,9 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
         cleanName: p.cleanName,
         imageUrl: p.imageUrl,
         url: p.url,
-        rarity: extractExtended(p, "Rarity"),
-        number: extractExtended(p, "Number"),
+        rarity,
+        number,
+        isSingle: classifyIsSingle(p.name, rarity, number),
       });
     }
 
@@ -101,17 +119,36 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
           url: sql`excluded.url`,
           rarity: sql`excluded.rarity`,
           number: sql`excluded.number`,
+          isSingle: sql`excluded.is_single`,
           updatedAt: sql`now()`,
         },
       });
   }
 
-  // Insert today's snapshots; ignore if this day was already ingested. Only
-  // insert snapshots for products we actually have a card row for.
+  // Upsert today's snapshots. Because we ingest several times a day (see the
+  // GitHub Actions schedule) and tcgcsv refreshes once daily, a later run that
+  // sees fresher prices overwrites the day's row. Only snapshot products we
+  // actually have a card row for.
   const knownIds = new Set(cardRows.map((c) => c.productId));
   const validSnaps = snapRows.filter((s) => knownIds.has(s.productId));
   for (const batch of chunk(validSnaps, 500)) {
-    await db.insert(priceSnapshots).values(batch).onConflictDoNothing();
+    await db
+      .insert(priceSnapshots)
+      .values(batch)
+      .onConflictDoUpdate({
+        target: [
+          priceSnapshots.productId,
+          priceSnapshots.subTypeName,
+          priceSnapshots.date,
+        ],
+        set: {
+          marketPrice: sql`excluded.market_price`,
+          lowPrice: sql`excluded.low_price`,
+          midPrice: sql`excluded.mid_price`,
+          highPrice: sql`excluded.high_price`,
+          directLowPrice: sql`excluded.direct_low_price`,
+        },
+      });
   }
 
   return {

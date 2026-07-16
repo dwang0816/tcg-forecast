@@ -3,8 +3,10 @@ import { sql } from "drizzle-orm";
 import { GameSlug } from "./games";
 
 export type Direction = "gainers" | "losers";
+export type Kind = "single" | "sealed";
 
 export interface MoverRow {
+  game: string;
   productId: number;
   name: string;
   groupName: string;
@@ -22,6 +24,7 @@ export interface MoverRow {
 }
 
 export interface ValuableRow {
+  game: string;
   productId: number;
   name: string;
   groupName: string;
@@ -40,19 +43,23 @@ function rowsOf<T>(res: unknown): T[] {
 }
 
 /**
- * Top price movers for a game over roughly `windowDays`. If we don't yet have
- * `windowDays` of history, it compares against the oldest snapshot we have and
- * reports the real `prevDate`, so the UI can label the true period.
- * `minPrice` filters out penny cards whose percentage swings are just noise.
+ * Top price movers over roughly `windowDays`.
+ * - `game` omitted  -> across all games (used by the cross-game Products view).
+ * - `kind`          -> "single" (individual cards) or "sealed" (boxes/packs).
+ * If we lack `windowDays` of history it compares against the oldest snapshot we
+ * have and reports the real `prevDate`, so the UI can label the true period.
+ * `minPrice` filters out cheap items whose percentage swings are just noise.
  */
 export async function getMovers({
   game,
+  kind,
   windowDays,
   direction,
-  limit = 24,
+  limit = 20,
   minPrice = 2,
 }: {
-  game: GameSlug;
+  game?: GameSlug;
+  kind: Kind;
   windowDays: number;
   direction: Direction;
   limit?: number;
@@ -60,13 +67,12 @@ export async function getMovers({
 }): Promise<MoverRow[]> {
   const db = getDb();
   const order = sql.raw(direction === "gainers" ? "DESC" : "ASC");
+  const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
+  const isSingle = kind === "single";
 
   const res = await db.execute(sql`
     WITH bounds AS (
-      SELECT max(ps.date) AS latest, min(ps.date) AS earliest
-      FROM price_snapshots ps
-      JOIN cards c ON c.product_id = ps.product_id
-      WHERE c.game = ${game}
+      SELECT max(date) AS latest, min(date) AS earliest FROM price_snapshots
     ),
     tgt AS (
       SELECT latest, earliest,
@@ -86,6 +92,7 @@ export async function getMovers({
       ORDER BY ps.product_id, ps.sub_type_name, ps.date DESC
     )
     SELECT
+      c.game            AS "game",
       c.product_id      AS "productId",
       c.name            AS "name",
       c.group_name      AS "groupName",
@@ -106,6 +113,8 @@ export async function getMovers({
     WHERE prev.market_price >= ${minPrice}
       AND cur.market_price <> prev.market_price
       AND prev.date < (SELECT latest FROM bounds)
+      AND c.is_single = ${isSingle}
+      ${gameFilter}
     ORDER BY "pctChange" ${order}
     LIMIT ${limit}
   `);
@@ -113,20 +122,24 @@ export async function getMovers({
   return rowsOf<MoverRow>(res);
 }
 
-/** Highest current market price for a game. Works from the very first ingest. */
-export async function getMostValuable(
-  game: GameSlug,
+/** Highest current market price. Works from the very first ingest. */
+export async function getMostValuable({
+  game,
+  kind = "single",
   limit = 24,
-): Promise<ValuableRow[]> {
+}: {
+  game?: GameSlug;
+  kind?: Kind;
+  limit?: number;
+}): Promise<ValuableRow[]> {
   const db = getDb();
+  const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
+  const isSingle = kind === "single";
+
   const res = await db.execute(sql`
-    WITH latest AS (
-      SELECT max(ps.date) AS d
-      FROM price_snapshots ps
-      JOIN cards c ON c.product_id = ps.product_id
-      WHERE c.game = ${game}
-    )
+    WITH latest AS (SELECT max(date) AS d FROM price_snapshots)
     SELECT
+      c.game            AS "game",
       c.product_id      AS "productId",
       c.name            AS "name",
       c.group_name      AS "groupName",
@@ -139,7 +152,9 @@ export async function getMostValuable(
     FROM price_snapshots ps
     JOIN latest ON ps.date = latest.d
     JOIN cards c ON c.product_id = ps.product_id
-    WHERE c.game = ${game} AND ps.market_price IS NOT NULL
+    WHERE ps.market_price IS NOT NULL
+      AND c.is_single = ${isSingle}
+      ${gameFilter}
     ORDER BY ps.market_price DESC
     LIMIT ${limit}
   `);
@@ -155,8 +170,9 @@ export interface GameStats {
 }
 
 /** Coverage summary used to drive empty states and "data through" labels. */
-export async function getGameStats(game: GameSlug): Promise<GameStats> {
+export async function getGameStats(game?: GameSlug): Promise<GameStats> {
   const db = getDb();
+  const gameFilter = game ? sql`WHERE c.game = ${game}` : sql``;
   const res = await db.execute(sql`
     SELECT
       max(ps.date) AS "latestDate",
@@ -165,7 +181,7 @@ export async function getGameStats(game: GameSlug): Promise<GameStats> {
       count(DISTINCT c.product_id) AS "cards"
     FROM cards c
     LEFT JOIN price_snapshots ps ON ps.product_id = c.product_id
-    WHERE c.game = ${game}
+    ${gameFilter}
   `);
   const row = rowsOf<{
     latestDate: string | null;

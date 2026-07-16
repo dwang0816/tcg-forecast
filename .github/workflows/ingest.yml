@@ -11,7 +11,16 @@ name: Daily price ingest
 
 on:
   schedule:
-    - cron: "0 21 * * *" # 21:00 UTC, just after tcgcsv's ~20:00 UTC refresh
+    # 6 runs/day, one hour apart, starting at tcgcsv's ~20:00 UTC refresh. The
+    # source only updates once a day, so these runs exist to reliably CATCH that
+    # update (and re-fetch if an early run lands before it, or a run is skipped).
+    # Snapshots upsert, so the freshest run of the day wins.
+    - cron: "0 20 * * *"
+    - cron: "0 21 * * *"
+    - cron: "0 22 * * *"
+    - cron: "0 23 * * *"
+    - cron: "0 0 * * *"
+    - cron: "0 1 * * *"
   workflow_dispatch: {} # allow manual runs from the Actions tab
 
 jobs:

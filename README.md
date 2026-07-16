@@ -1,9 +1,15 @@
 # TCG Forecast 📈
 
-Daily price-movement tracker for **Pokémon**, **One Piece**, and **Riftbound**
-trading cards. It records the market price of every card once a day and surfaces
-the **biggest gainers and losers** over 24 hours, 7 days, and 30 days — plus a
-**Most Valuable** list.
+Price-movement tracker for **Pokémon**, **One Piece**, and **Riftbound**
+trading cards.
+
+- **Per game:** top 20 **singles** rising and top 20 falling, over 24h / 7d / 30d.
+- **All games combined:** top 20 **sealed products** (boxes, packs, decks) rising
+  and falling.
+- **Most Valuable** singles per game.
+
+Singles vs. sealed products are separated automatically at ingest time (singles
+carry a card rarity/number; sealed products don't).
 
 Built with Next.js (App Router) + Drizzle + Neon Postgres, deployed on Vercel.
 
@@ -23,13 +29,21 @@ Neon Postgres
   price_snapshots  — one row per (product, subtype, day)
         │
         ▼
-Next.js pages  /  ·  /pokemon  ·  /onepiece  ·  /riftbound
+Next.js pages  /  ·  /pokemon  ·  /onepiece  ·  /riftbound  ·  /products
 ```
 
-**Why daily?** The upstream source ([tcgcsv.com](https://tcgcsv.com), a free
-mirror of TCGplayer market prices) refreshes once per day around 20:00 UTC.
-Polling more often just returns identical numbers. Trends are computed by
-diffing today's snapshot against an earlier one, so we keep our own history.
+**Update cadence.** The ingest runs **6× a day, one hour apart (20:00–01:00
+UTC)**. The upstream source ([tcgcsv.com](https://tcgcsv.com), a free mirror of
+TCGplayer market prices) only refreshes **once per day around 20:00 UTC**, so
+these runs aren't for intraday granularity — they reliably *catch* that daily
+update (and re-fetch if a run lands before it or gets skipped). Snapshots are
+keyed by day and **upserted**, so the freshest run of the day wins. Trends are
+computed by diffing today's snapshot against an earlier one — we keep our own
+history.
+
+> Want genuine intraday price movement? That requires a source that updates more
+> than once a day (generally paid). The schema already supports it — you'd swap
+> the ingest source and key snapshots by timestamp instead of date.
 
 **Trends build over time.** On a brand-new database there's no history yet, so
 gainers/losers are empty until the second daily run (24 h), and the 7 d / 30 d
@@ -112,8 +126,9 @@ Actions):
 - `INGEST_BASE_URL` — your deployed URL, e.g. `https://your-app.vercel.app`
 - `CRON_SECRET` — the same value as in Vercel
 
-The workflow runs daily at 21:00 UTC. You can also trigger it manually from the
-**Actions** tab (“Run workflow”) to seed data immediately after deploying.
+The workflow runs 6× a day (20:00–01:00 UTC, hourly). You can also trigger it
+manually from the **Actions** tab (“Run workflow”) to seed data immediately
+after deploying.
 
 > **Alternative — Vercel Cron (Pro plan).** If you're on Vercel Pro, skip GitHub
 > Actions and add a `vercel.json` instead:
@@ -135,7 +150,7 @@ The workflow runs daily at 21:00 UTC. You can also trigger it manually from the
 
 | table | key | notable columns |
 | --- | --- | --- |
-| `cards` | `product_id` | `game`, `group_name` (set), `name`, `image_url`, `url`, `rarity`, `number` |
+| `cards` | `product_id` | `game`, `group_name` (set), `name`, `image_url`, `url`, `rarity`, `number`, `is_single` (card vs. sealed) |
 | `price_snapshots` | `(product_id, sub_type_name, date)` | `market_price`, `low/mid/high_price`, `direct_low_price` |
 
 `sub_type_name` distinguishes printings such as `Normal` vs `Foil`, which carry

@@ -1,5 +1,5 @@
 {
-  "id": "bbac1c85-e336-41ac-9a04-93918f7b0c3f",
+  "id": "e175cbf0-da1d-4a4b-9b24-494cced95120",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -74,6 +74,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_single": {
+          "name": "is_single",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp",
@@ -88,6 +95,27 @@
           "columns": [
             {
               "expression": "game",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "cards_game_single_idx": {
+          "name": "cards_game_single_idx",
+          "columns": [
+            {
+              "expression": "game",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_single",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

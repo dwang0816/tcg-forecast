@@ -3,6 +3,7 @@ import {
   integer,
   text,
   date,
+  boolean,
   doublePrecision,
   timestamp,
   primaryKey,
@@ -25,9 +26,14 @@ export const cards = pgTable(
     url: text("url"), // tcgplayer product page
     rarity: text("rarity"),
     number: text("number"),
+    // true = individual card ("single"); false = sealed product (box/pack/deck)
+    isSingle: boolean("is_single").notNull().default(false),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("cards_game_idx").on(t.game)],
+  (t) => [
+    index("cards_game_idx").on(t.game),
+    index("cards_game_single_idx").on(t.game, t.isSingle),
+  ],
 );
 
 // One row per (product, price subtype, day). subTypeName is e.g. "Normal" / "Foil".

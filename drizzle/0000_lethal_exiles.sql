@@ -10,6 +10,7 @@ CREATE TABLE "cards" (
 	"url" text,
 	"rarity" text,
 	"number" text,
+	"is_single" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -27,4 +28,5 @@ CREATE TABLE "price_snapshots" (
 --> statement-breakpoint
 ALTER TABLE "price_snapshots" ADD CONSTRAINT "price_snapshots_product_id_cards_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."cards"("product_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "cards_game_idx" ON "cards" USING btree ("game");--> statement-breakpoint
+CREATE INDEX "cards_game_single_idx" ON "cards" USING btree ("game","is_single");--> statement-breakpoint
 CREATE INDEX "snap_date_idx" ON "price_snapshots" USING btree ("date");

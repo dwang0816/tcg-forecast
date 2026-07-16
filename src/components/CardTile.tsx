@@ -1,4 +1,5 @@
 import { money, percent, signedMoney } from "@/lib/format";
+import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 
 export interface CardTileProps {
   rank: number;
@@ -11,6 +12,8 @@ export interface CardTileProps {
   number: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
+  /** When set, shows a small game badge (used in cross-game views). */
+  gameSlug?: string;
 }
 
 export function CardTile({
@@ -23,8 +26,10 @@ export function CardTile({
   rarity,
   price,
   change,
+  gameSlug,
 }: CardTileProps) {
   const up = change ? change.pct >= 0 : false;
+  const game = gameSlug && isGameSlug(gameSlug) ? GAME_BY_SLUG[gameSlug] : null;
 
   return (
     <a
@@ -55,6 +60,14 @@ export function CardTile({
         {subTypeName && subTypeName !== "Normal" && (
           <span className="absolute right-2 top-2 rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">
             {subTypeName}
+          </span>
+        )}
+
+        {game && (
+          <span
+            className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
+          >
+            {game.name}
           </span>
         )}
       </div>
