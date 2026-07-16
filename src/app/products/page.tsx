@@ -1,7 +1,14 @@
-import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
+import {
+  getMovers,
+  getMostValuable,
+  getGameStats,
+  MoverRow,
+  ValuableRow,
+} from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
 import { ValueSection } from "@/components/ValueSection";
+import { ViewTabs, View, parseView, isMoversView } from "@/components/ViewTabs";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -16,35 +23,51 @@ function parseWindow(w: string | undefined): number {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ view?: string; window?: string }>;
 }) {
   const sp = await searchParams;
+  const view = parseView(sp.view);
   const windowDays = parseWindow(sp.window);
+
+  const href = (v: View) => `/products?view=${v}&window=${windowDays}`;
 
   // Sealed products across ALL games. minPrice raised — sealed rarely trades low.
   const { data, error } = await safeLoad(async () => {
-    const [stats, gainers, losers, valuable, unconfirmed] = await Promise.all([
-      getGameStats(),
-      getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
-      getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
-      getMostValuable({ kind: "sealed", limit: 100, basis: "confirmed" }),
-      getMostValuable({ kind: "sealed", limit: 25, basis: "unconfirmed" }),
-    ]);
-    return { stats, gainers, losers, valuable, unconfirmed };
+    const stats = await getGameStats();
+    if (isMoversView(view)) {
+      const movers = await getMovers({
+        kind: "sealed",
+        windowDays,
+        direction: view === "gainers" ? "gainers" : "losers",
+        limit: 20,
+        minPrice: 5,
+      });
+      return { stats, movers, valuable: [] as ValuableRow[] };
+    }
+    const valuable = await getMostValuable({
+      kind: "sealed",
+      limit: view === "valuable" ? 100 : 25,
+      basis: view === "valuable" ? "confirmed" : "unconfirmed",
+    });
+    return { stats, movers: [] as MoverRow[], valuable };
   });
+
+  const header = (
+    <h1 className="text-2xl font-semibold tracking-tight">
+      Sealed products <span className="text-white/50">· all games</span>
+    </h1>
+  );
 
   if (error || !data) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Sealed products <span className="text-white/50">· all games</span>
-        </h1>
+        {header}
         {error && <DbErrorBanner error={error} />}
       </div>
     );
   }
 
-  const { stats, gainers, losers, valuable, unconfirmed } = data;
+  const { stats, movers, valuable } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2
@@ -52,51 +75,57 @@ export default async function ProductsPage({
       : "No sealed products moved enough over this period (items under $5 are ignored). Try a longer period.";
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Sealed products{" "}
-            <span className="text-white/50">· all games</span>
-          </h1>
-          <p className="text-xs text-white/40">
-            Pokémon · One Piece · Riftbound · data through{" "}
-            {formatDate(stats.latestDate)}
-          </p>
-        </div>
-        <WindowToggle
-          windowDays={windowDays}
-          makeHref={(d) => `/products?window=${d}`}
-        />
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        {header}
+        <p className="text-xs text-white/40">
+          Pokémon · One Piece · Riftbound · data through{" "}
+          {formatDate(stats.latestDate)}
+        </p>
       </div>
 
-      <MoversSection
-        title="▲ Top 20 Products Rising"
-        rows={gainers}
-        windowDays={windowDays}
-        showGameBadge
-        emptyBody={emptyBody}
-      />
-      <MoversSection
-        title="▼ Top 20 Products Falling"
-        rows={losers}
-        windowDays={windowDays}
-        showGameBadge
-        emptyBody={emptyBody}
-      />
+      <ViewTabs view={view} makeHref={href} sealed />
 
-      <ValueSection
-        title="★ Most Valuable Sealed"
-        subtitle="Ranked by confirmed TCGplayer market price — products that actually sell at this level."
-        rows={valuable}
-      />
+      {isMoversView(view) && (
+        <WindowToggle
+          windowDays={windowDays}
+          makeHref={(d) => `/products?view=${view}&window=${d}`}
+        />
+      )}
 
-      <ValueSection
-        title="◇ Unconfirmed — asking price only"
-        subtitle="No confirmed TCGplayer sales for these, so all we have is a seller's asking price. Shown separately so they don't distort the ranking above."
-        rows={unconfirmed}
-        tone="warning"
-      />
+      {view === "gainers" && (
+        <MoversSection
+          title="▲ Top 20 Products Rising"
+          rows={movers}
+          windowDays={windowDays}
+          showGameBadge
+          emptyBody={emptyBody}
+        />
+      )}
+      {view === "losers" && (
+        <MoversSection
+          title="▼ Top 20 Products Falling"
+          rows={movers}
+          windowDays={windowDays}
+          showGameBadge
+          emptyBody={emptyBody}
+        />
+      )}
+      {view === "valuable" && (
+        <ValueSection
+          title="★ Most Valuable Sealed"
+          subtitle="Ranked by confirmed TCGplayer market price — products that actually sell at this level."
+          rows={valuable}
+        />
+      )}
+      {view === "unconfirmed" && (
+        <ValueSection
+          title="◇ Unconfirmed — asking price only"
+          subtitle="No confirmed TCGplayer sales for these, so all we have is a seller's asking price. Kept separate so they don't distort the ranking."
+          rows={valuable}
+          tone="warning"
+        />
+      )}
     </div>
   );
 }

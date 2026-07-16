@@ -11,14 +11,14 @@ export function ValueSection({
   subtitle,
   rows,
   tone = "normal",
+  emptyBody = "Nothing to show here yet.",
 }: {
   title: string;
   subtitle?: string;
   rows: ValuableRow[];
   tone?: "normal" | "warning";
+  emptyBody?: string;
 }) {
-  if (rows.length === 0) return null;
-
   return (
     <section className="flex flex-col gap-3">
       <div
@@ -33,20 +33,29 @@ export function ValueSection({
         >
           {title}
         </h2>
-        <span className="text-xs text-white/40">top {rows.length}</span>
+        {rows.length > 0 && (
+          <span className="text-xs text-white/40">top {rows.length}</span>
+        )}
         {subtitle && (
           <p className="w-full text-xs text-white/40">{subtitle}</p>
         )}
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {rows.map((row, i) => (
-          <ValueCard
-            key={`${row.productId}-${row.subTypeName}`}
-            row={row}
-            rank={i + 1}
-          />
-        ))}
-      </div>
+
+      {rows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {rows.map((row, i) => (
+            <ValueCard
+              key={`${row.productId}-${row.subTypeName}`}
+              row={row}
+              rank={i + 1}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center text-sm text-white/40">
+          {emptyBody}
+        </p>
+      )}
     </section>
   );
 }

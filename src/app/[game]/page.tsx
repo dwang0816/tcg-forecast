@@ -1,9 +1,16 @@
 import { notFound } from "next/navigation";
 import { GAMES, GAME_BY_SLUG, isGameSlug } from "@/lib/games";
-import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
+import {
+  getMovers,
+  getMostValuable,
+  getGameStats,
+  MoverRow,
+  ValuableRow,
+} from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
 import { ValueSection } from "@/components/ValueSection";
+import { ViewTabs, View, parseView, isMoversView } from "@/components/ViewTabs";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -24,39 +31,57 @@ export default async function GamePage({
   searchParams,
 }: {
   params: Promise<{ game: string }>;
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ view?: string; window?: string }>;
 }) {
   const { game: slug } = await params;
   if (!isGameSlug(slug)) notFound();
 
   const sp = await searchParams;
+  const view = parseView(sp.view);
   const windowDays = parseWindow(sp.window);
   const game = GAME_BY_SLUG[slug];
 
+  const href = (v: View) => `/${slug}?view=${v}&window=${windowDays}`;
+
+  // Only load the active tab's data — no point querying lists nobody's looking at.
   const { data, error } = await safeLoad(async () => {
-    const [stats, gainers, losers, valuable, unconfirmed] = await Promise.all([
-      getGameStats(slug),
-      getMovers({ game: slug, kind: "single", windowDays, direction: "gainers", limit: 20 }),
-      getMovers({ game: slug, kind: "single", windowDays, direction: "losers", limit: 20 }),
-      getMostValuable({ game: slug, kind: "single", limit: 100, basis: "confirmed" }),
-      getMostValuable({ game: slug, kind: "single", limit: 25, basis: "unconfirmed" }),
-    ]);
-    return { stats, gainers, losers, valuable, unconfirmed };
+    const stats = await getGameStats(slug);
+    if (isMoversView(view)) {
+      const movers = await getMovers({
+        game: slug,
+        kind: "single",
+        windowDays,
+        direction: view === "gainers" ? "gainers" : "losers",
+        limit: 20,
+      });
+      return { stats, movers, valuable: [] as ValuableRow[] };
+    }
+    const valuable = await getMostValuable({
+      game: slug,
+      kind: "single",
+      limit: view === "valuable" ? 100 : 25,
+      basis: view === "valuable" ? "confirmed" : "unconfirmed",
+    });
+    return { stats, movers: [] as MoverRow[], valuable };
   });
+
+  const header = (
+    <h1 className="text-2xl font-semibold tracking-tight">
+      <span className={game.accentText}>{game.name}</span>{" "}
+      <span className="text-white/50">singles</span>
+    </h1>
+  );
 
   if (error || !data) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          <span className={game.accentText}>{game.name}</span>{" "}
-          <span className="text-white/50">singles</span>
-        </h1>
+        {header}
         {error && <DbErrorBanner error={error} />}
       </div>
     );
   }
 
-  const { stats, gainers, losers, valuable, unconfirmed } = data;
+  const { stats, movers, valuable } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2
@@ -64,50 +89,56 @@ export default async function GamePage({
       : `No ${game.name} singles moved enough over this period (cards under $2 are ignored to cut noise). Try a longer period.`;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            <span className={game.accentText}>{game.name}</span>{" "}
-            <span className="text-white/50">singles</span>
-          </h1>
-          <p className="text-xs text-white/40">
-            {stats.cardCount.toLocaleString()} products · data through{" "}
-            {formatDate(stats.latestDate)} · {stats.daysOfHistory} day
-            {stats.daysOfHistory === 1 ? "" : "s"} tracked
-          </p>
-        </div>
-        <WindowToggle
-          windowDays={windowDays}
-          makeHref={(d) => `/${slug}?window=${d}`}
-        />
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        {header}
+        <p className="text-xs text-white/40">
+          {stats.cardCount.toLocaleString()} products · data through{" "}
+          {formatDate(stats.latestDate)} · {stats.daysOfHistory} day
+          {stats.daysOfHistory === 1 ? "" : "s"} tracked
+        </p>
       </div>
 
-      <MoversSection
-        title="▲ Top 20 Gainers"
-        rows={gainers}
-        windowDays={windowDays}
-        emptyBody={emptyBody}
-      />
-      <MoversSection
-        title="▼ Top 20 Losers"
-        rows={losers}
-        windowDays={windowDays}
-        emptyBody={emptyBody}
-      />
+      <ViewTabs view={view} makeHref={href} />
 
-      <ValueSection
-        title="★ Most Valuable"
-        subtitle="Ranked by confirmed TCGplayer market price — cards that actually sell at this level."
-        rows={valuable}
-      />
+      {isMoversView(view) && (
+        <WindowToggle
+          windowDays={windowDays}
+          makeHref={(d) => `/${slug}?view=${view}&window=${d}`}
+        />
+      )}
 
-      <ValueSection
-        title="◇ Unconfirmed — asking price only"
-        subtitle="Nobody has bought one of these on TCGplayer, so there's no market price. These are seller asking prices, which can be pure fantasy — shown separately so they don't distort the ranking above."
-        rows={unconfirmed}
-        tone="warning"
-      />
+      {view === "gainers" && (
+        <MoversSection
+          title="▲ Top 20 Gainers"
+          rows={movers}
+          windowDays={windowDays}
+          emptyBody={emptyBody}
+        />
+      )}
+      {view === "losers" && (
+        <MoversSection
+          title="▼ Top 20 Losers"
+          rows={movers}
+          windowDays={windowDays}
+          emptyBody={emptyBody}
+        />
+      )}
+      {view === "valuable" && (
+        <ValueSection
+          title="★ Most Valuable"
+          subtitle="Ranked by confirmed TCGplayer market price — cards that actually sell at this level."
+          rows={valuable}
+        />
+      )}
+      {view === "unconfirmed" && (
+        <ValueSection
+          title="◇ Unconfirmed — asking price only"
+          subtitle="Nobody has bought one of these on TCGplayer, so there's no market price. These are seller asking prices, which can be pure fantasy — kept separate so they don't distort the ranking."
+          rows={valuable}
+          tone="warning"
+        />
+      )}
     </div>
   );
 }
