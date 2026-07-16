@@ -20,6 +20,8 @@ export interface IngestResult {
   cards: number;
   tracked: number;
   snapshots: number;
+  /** True when we already held this day and didn't re-pull tcgcsv. */
+  skipped?: boolean;
 }
 
 /** Today's date in UTC as "YYYY-MM-DD". */
@@ -31,6 +33,53 @@ function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+/**
+ * Do we already hold a COMPLETE day for this game at this date?
+ *
+ * We run 6x/day to reliably catch tcgcsv's single ~20:00 UTC refresh, but their
+ * docs ask for one pull per 24 hours ("There is no benefit to polling the files
+ * more frequently"). Five of those six runs re-fetch the whole catalog and write
+ * back byte-identical rows. This lets those five cost one tiny request instead,
+ * while the run that finds new data still does the real work.
+ *
+ * "Complete" is measured against the previous stored day's row count rather than
+ * mere existence, because a run that died midway through the snapshot batches
+ * would otherwise look done forever and leave that day permanently short. The
+ * count moves a little day to day as cards enter and leave the tracked set, so
+ * 90% is the tolerance. Without a bookkeeping table this is the only completeness
+ * signal available.
+ */
+async function haveCompleteDay(
+  game: string,
+  language: Language,
+  date: string,
+): Promise<boolean> {
+  const db = getDb();
+  // Bounded to two dates so this stays an index scan, not a walk of the whole
+  // multi-million-row history.
+  const res = await db.execute(sql`
+    WITH prev AS (
+      SELECT max(s.date) AS d
+      FROM price_snapshots s
+      JOIN cards c ON c.product_id = s.product_id
+      WHERE c.game = ${game} AND c.language = ${language} AND s.date < ${date}
+    )
+    SELECT
+      count(*) FILTER (WHERE s.date = ${date})::int AS today,
+      count(*) FILTER (WHERE s.date = (SELECT d FROM prev))::int AS prev_n
+    FROM price_snapshots s
+    JOIN cards c ON c.product_id = s.product_id
+    WHERE c.game = ${game}
+      AND c.language = ${language}
+      AND s.date IN (${date}, COALESCE((SELECT d FROM prev), ${date}))
+  `);
+  const row = (res as unknown as { rows?: { today: number; prev_n: number }[] })
+    .rows?.[0];
+  if (!row || row.today === 0) return false;
+  if (!row.prev_n) return true; // first day we've ever stored — nothing to compare
+  return row.today >= row.prev_n * 0.9;
 }
 
 // Sealed products (boxes, packs, decks, etc.) never carry a card rarity/number.
@@ -57,6 +106,7 @@ export async function ingestGame(
   game: Game,
   language: Language = "EN",
   date?: string,
+  opts: { force?: boolean } = {},
 ): Promise<IngestResult> {
   const db = getDb();
   const categoryId = categoryFor(game, language);
@@ -69,6 +119,23 @@ export async function ingestGame(
   // would create a duplicate phantom day and break movers. Fall back to our own
   // UTC date only if tcgcsv doesn't tell us.
   const snapshotDate = date ?? (await getLastUpdated()) ?? utcDate();
+
+  // Bail before touching tcgcsv's catalog if this day is already banked. This is
+  // the whole saving: last-updated.txt is a few bytes, the catalog is thousands
+  // of products across hundreds of groups.
+  if (!opts.force && (await haveCompleteDay(game.slug, language, snapshotDate))) {
+    return {
+      game: game.slug,
+      language,
+      date: snapshotDate,
+      groups: 0,
+      cards: 0,
+      tracked: 0,
+      snapshots: 0,
+      skipped: true,
+    };
+  }
+
   const groups = await getGroups(categoryId);
 
   const cardRows: NewCard[] = [];

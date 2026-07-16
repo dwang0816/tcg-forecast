@@ -13,8 +13,13 @@ on:
   schedule:
     # 6 runs/day, one hour apart, starting at tcgcsv's ~20:00 UTC refresh. The
     # source only updates once a day, so these runs exist to reliably CATCH that
-    # update (and re-fetch if an early run lands before it, or a run is skipped).
-    # Snapshots upsert, so the freshest run of the day wins.
+    # update (an early run can land before it, and Actions skips runs under load).
+    #
+    # Only ONE of the six actually pulls the catalog. The endpoint checks
+    # tcgcsv's last-updated.txt against what we already hold and returns
+    # skipped:true without fetching, because tcgcsv asks for one pull per 24h:
+    # "There is no benefit to polling the files more frequently." So this is six
+    # cheap checks, not six pulls. Don't add ?force=1 here — that's the hammer.
     - cron: "0 20 * * *"
     - cron: "0 21 * * *"
     - cron: "0 22 * * *"

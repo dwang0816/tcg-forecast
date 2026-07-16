@@ -18,6 +18,14 @@ export const maxDuration = 300; // seconds (capped to plan limit; Hobby = 60s)
  *                                        limit). Omit to ingest everything.
  *   ?language=EN|JP                   — restrict to one language. Only Pokémon
  *                                        has a JP catalog on TCGplayer.
+ *   ?force=1                          — re-pull even if we already hold this
+ *                                        day. For repairing a bad day by hand;
+ *                                        the schedule should never set it, or
+ *                                        we're back to hammering tcgcsv 6x.
+ *
+ * Normally a run whose day is already banked returns skipped:true without
+ * fetching the catalog — tcgcsv asks for one pull per 24h, and five of our six
+ * daily runs would otherwise re-fetch identical data.
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -30,6 +38,7 @@ export async function GET(req: NextRequest) {
 
   const gameParam = req.nextUrl.searchParams.get("game");
   const langParam = req.nextUrl.searchParams.get("language");
+  const force = req.nextUrl.searchParams.get("force") === "1";
 
   let targets = allGameLanguages();
   if (gameParam && isGameSlug(gameParam)) {
@@ -45,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   for (const { game, language } of targets) {
     try {
-      results.push(await ingestGame(game, language));
+      results.push(await ingestGame(game, language, undefined, { force }));
     } catch (err) {
       errors.push({ game: game.slug, language, error: String(err) });
     }
