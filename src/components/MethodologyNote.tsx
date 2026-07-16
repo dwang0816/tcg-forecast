@@ -39,14 +39,25 @@ export function MethodologyNote({
       <h3 className="text-base font-semibold text-white">
         How we work out the change
       </h3>
-      <p className="mt-1 text-sm text-white/50">
-        We check the price {period === 1 ? "yesterday" : `${period} days ago`}, then
-        compare it with today.
+      {/* Name the number before doing anything with it. "The price" begged the
+          question people actually have — WHICH price? — and the answer was folded
+          away in the math drawer, which is the one place a confused reader won't
+          look. */}
+      <p className="mt-1 text-sm leading-relaxed text-white/55">
+        We use TCGplayer&apos;s{" "}
+        <strong className="font-semibold text-white/90">market price</strong> — what
+        the card actually sold for, worked out from real completed sales. Not what
+        sellers are asking, and not eBay or Japanese shops. We take that price{" "}
+        {period === 1 ? "yesterday" : `${period} days ago`}{" "}
+        and compare it with today&apos;s.
       </p>
 
       {/* A real example, not a made-up one — this is the top card on screen. */}
       {example && (
         <div className="mt-4 rounded-xl bg-black/25 p-4">
+          <p className="mb-3 text-[11px] font-medium text-white/40">
+            TCGplayer market price — {example.name}
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <Stat label={fromDate ?? `${period} days ago`} value={money(example.from)} />
             <span className="text-lg text-white/25">→</span>
@@ -63,8 +74,8 @@ export function MethodologyNote({
             </span>
           </div>
           <p className="mt-3 text-xs text-white/40">
-            That&apos;s <span className="text-white/70">{example.name}</span> — the
-            top card below. It {up ? "went up" : "went down"} by{" "}
+            That&apos;s the top card below. Its market price{" "}
+            {up ? "went up" : "went down"} by{" "}
             {money(Math.abs(example.to - example.from))}, which is{" "}
             {percent(example.pct)} of what it used to cost.
           </p>
@@ -73,10 +84,9 @@ export function MethodologyNote({
 
       {/* Three rules, one sentence each. */}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Rule icon="💵" title="Only real sales count">
-          A price counts only if someone actually bought the card. What a seller{" "}
-          <em>hopes</em>{" "}
-          to get doesn&apos;t count.
+        <Rule icon="💵" title="No sale, no number">
+          If nobody bought a copy, there&apos;s no market price to compare — those
+          cards sit under &ldquo;Unconfirmed&rdquo; rather than in these lists.
         </Rule>
         <Rule icon="🪙" title="Cheap cards are skipped">
           A {minPrice === 5 ? "$1" : "40¢"} card going to{" "}
@@ -112,15 +122,13 @@ export function MethodologyNote({
         <div className="mt-3 flex flex-col gap-4 text-xs leading-relaxed text-white/45">
           <div>
             <code className="block overflow-x-auto whitespace-nowrap rounded-lg bg-black/40 px-3 py-2 text-emerald-300/90">
-              change % = (price today − price {period} days ago) ÷ price {period}{" "}
-              days ago
+              change % = (market price today − market price {period} days ago) ÷
+              market price {period} days ago
             </code>
             <p className="mt-2">
-              Price means TCGplayer&apos;s <strong>market price</strong>{" "}
-              — worked out from real completed sales. Cards nobody has bought are left out
-              of these lists entirely; you&apos;ll find them under
-              &ldquo;Unconfirmed&rdquo;. We save every tracked card&apos;s price
-              once a day, and each printing (Normal, Foil…) is counted separately.
+              We save every tracked card&apos;s market price once a day, and each
+              printing (Normal, Foil…) is counted separately — so a Foil copy never
+              gets compared against a Normal one.
             </p>
           </div>
 
