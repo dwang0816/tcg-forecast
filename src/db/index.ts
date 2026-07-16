@@ -54,7 +54,11 @@ export function getDb(): NodePgDatabase<typeof schema> {
   const pool = new Pool({
     connectionString: url.toString(),
     ssl: isLocal ? undefined : { rejectUnauthorized: false },
-    max: 3,
+    // The home page fans out one getGameStats per game concurrently, so a pool of
+    // 3 left zero headroom — a single slow query starved the others until they hit
+    // connectionTimeoutMillis. Railway allows 100 connections; this is per
+    // instance, so keep it well under that divided by expected concurrency.
+    max: 5,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
   });

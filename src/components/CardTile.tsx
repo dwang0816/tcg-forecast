@@ -13,7 +13,6 @@ export interface CardTileProps {
   groupName: string;
   imageUrl: string | null;
   altImageUrls?: string[] | null;
-  url: string | null;
   subTypeName: string;
   rarity: string | null;
   number: string | null;
@@ -37,7 +36,6 @@ export function CardTile({
   groupName,
   imageUrl,
   altImageUrls,
-  url,
   subTypeName,
   rarity,
   number,

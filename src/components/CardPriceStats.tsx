@@ -124,12 +124,6 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
       ? (latest.low - cur) / cur
       : null;
 
-  // confidenceTier() falls back to "low" when the spread is unknown, which would
-  // libel a card that simply has no listings. Only show a tier when there's a
-  // real ratio behind it.
-  const ratio = spreadRatio(latest?.low, latest?.high);
-  const tier = ratio != null ? confidenceTier(latest?.low, latest?.high) : null;
-
   // A big move that ended a long freeze is a catch-up. Only worth calling out
   // while it's still the headline number people are reading (~a week).
   const m = s.lastMove;

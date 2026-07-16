@@ -60,7 +60,7 @@ Requires Node 18+.
 
 1. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Create a Postgres database** on Railway (<https://railway.app> → New →
@@ -76,7 +76,7 @@ Requires Node 18+.
 
 4. **Create the tables**:
    ```bash
-   npm run schema
+   pnpm run schema
    ```
    Use this, not `drizzle-kit push`. The `search_text` column is a generated
    column and its trigram indexes can't be expressed in `src/db/schema.ts`, so
@@ -86,17 +86,17 @@ Requires Node 18+.
 
 5. **Pull the first day of prices**:
    ```bash
-   npm run ingest            # all three games
+   pnpm run ingest            # all three games
    # or one at a time:
-   npm run ingest riftbound
+   pnpm run ingest riftbound
    ```
 
 6. **Run the app**:
    ```bash
-   npm run dev
+   pnpm run dev
    ```
    Open <http://localhost:3000>. You'll see the Most Valuable list immediately;
-   run `npm run ingest` again on another day to see movers populate.
+   run `pnpm run ingest` again on another day to see movers populate.
 
 ---
 
@@ -119,7 +119,7 @@ Requires Node 18+.
 4. **Create the tables on the production DB** (once). Easiest from your machine
    with the production `DATABASE_URL` in `.env.local`:
    ```bash
-   npm run db:push
+   pnpm run schema
    ```
 
 5. **Deploy.** Vercel builds and hosts it.
@@ -169,13 +169,20 @@ independent prices.
 
 | command | what it does |
 | --- | --- |
-| `npm run dev` | start the dev server |
-| `npm run build` / `npm start` | production build / serve |
-| `npm run ingest [game]` | pull prices now (all games, or one) |
-| `npm run db:push` | create/update tables on the DB from the schema |
-| `npm run db:generate` | generate a SQL migration into `drizzle/` |
-| `npm run db:migrate` | apply generated migrations |
-| `npm run db:studio` | open Drizzle Studio to browse the data |
+| `pnpm dev` | start the dev server |
+| `pnpm build` / `pnpm start` | production build / serve |
+| `pnpm run schema` | create/update tables — the source of truth, see below |
+| `pnpm run ingest [game] [lang] [force]` | pull today's prices (skips a day already stored) |
+| `pnpm run backfill <days> [force]` | load history from tcgcsv's archives (needs 7-Zip) |
+| `pnpm run lint` | eslint |
+| `pnpm run db:generate` | generate a SQL migration into `drizzle/` |
+| `pnpm run db:migrate` | apply generated migrations |
+| `pnpm run db:studio` | open Drizzle Studio to browse the data |
+
+> There is deliberately no `db:push`. `drizzle-kit push` builds the schema from
+> `src/db/schema.ts`, which can't express the `search_text` generated column or
+> its trigram indexes — so it produces a database where search silently returns
+> nothing. `scripts/schema.sql` is the source of truth; keep it in sync by hand.
 
 ## Data source & attribution
 

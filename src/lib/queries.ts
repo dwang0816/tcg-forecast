@@ -251,15 +251,32 @@ export async function getGameStats(
   let gameFilter = sql``;
   if (conds.length === 1) gameFilter = sql`WHERE ${conds[0]}`;
   if (conds.length === 2) gameFilter = sql`WHERE ${conds[0]} AND ${conds[1]}`;
+
+  // Shaped carefully, because this is cheap at 600k snapshots and ruinous at 8.6M.
+  //
+  // The obvious version — one LEFT JOIN with count(DISTINCT ps.date) and
+  // count(DISTINCT c.product_id) — made Postgres materialise all ~8M joined rows
+  // and SORT them (140MB spilled to disk, 8.7s) just to find ~730 distinct dates.
+  // count(DISTINCT) always forces a sort. A DISTINCT subquery doesn't: the planner
+  // uses a HashAggregate, 8M rows collapse to 730 groups, and it drops to ~1.5s.
+  //
+  // Counting cards is also split out entirely — it only needs the cards index, and
+  // dragging it through the join was what forced the second DISTINCT.
   const res = await db.execute(sql`
     SELECT
-      max(ps.date) AS "latestDate",
-      min(ps.date) AS "earliestDate",
-      count(DISTINCT ps.date) AS "days",
-      count(DISTINCT c.product_id) AS "cards"
-    FROM cards c
-    LEFT JOIN price_snapshots ps ON ps.product_id = c.product_id
-    ${gameFilter}
+      (SELECT count(*)::int FROM cards c ${gameFilter}) AS "cards",
+      d.latest   AS "latestDate",
+      d.earliest AS "earliestDate",
+      d.days     AS "days"
+    FROM (
+      SELECT max(t.date) AS latest, min(t.date) AS earliest, count(*)::int AS days
+      FROM (
+        SELECT DISTINCT ps.date
+        FROM price_snapshots ps
+        JOIN cards c ON c.product_id = ps.product_id
+        ${gameFilter}
+      ) t
+    ) d
   `);
   const row = rowsOf<{
     latestDate: string | null;
