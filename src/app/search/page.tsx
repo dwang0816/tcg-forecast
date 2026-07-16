@@ -50,11 +50,12 @@ export default async function SearchPage({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Search cards</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Look up a card</h1>
         <p className="mt-1 text-sm text-white/45">
-          Search by anything on the card — name, set, rarity or number. Words can
-          come from different fields: &ldquo;cleffa obsidian&rdquo;, &ldquo;charizard
-          illustration rare&rdquo;, &ldquo;OP01-024&rdquo;.
+          Find any single card or sealed product to see its price, price history
+          and card details. Search by anything on the card — name, set, rarity or
+          number — and the words can come from different fields: &ldquo;cleffa
+          obsidian&rdquo;, &ldquo;charizard illustration rare&rdquo;, &ldquo;OP01-024&rdquo;.
         </p>
       </div>
 
