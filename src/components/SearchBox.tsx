@@ -6,13 +6,28 @@ export function SearchBox({
   defaultValue = "",
   autoFocus = false,
   compact = false,
+  action = "/search",
+  placeholder,
+  hidden,
 }: {
   defaultValue?: string;
   autoFocus?: boolean;
   compact?: boolean;
+  /** Where the form submits. Defaults to the global card search. */
+  action?: string;
+  placeholder?: string;
+  /** Filters to carry through the submit — see below. */
+  hidden?: Record<string, string>;
 }) {
   return (
-    <form action="/search" method="GET" className={compact ? "" : "w-full"} role="search">
+    <form action={action} method="GET" className={compact ? "" : "w-full"} role="search">
+      {/* A GET form replaces the entire query string with its own fields, so any
+          filter already in the URL has to ride along or submitting the search
+          silently resets it. */}
+      {hidden &&
+        Object.entries(hidden).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
           ⌕
@@ -22,7 +37,12 @@ export function SearchBox({
           name="q"
           defaultValue={defaultValue}
           autoFocus={autoFocus}
-          placeholder={compact ? "Search cards…" : "Search by card name or number — e.g. Charizard, OP01-024"}
+          placeholder={
+            placeholder ??
+            (compact
+              ? "Search cards…"
+              : "Search by card name or number — e.g. Charizard, OP01-024")
+          }
           aria-label="Search cards"
           className={`w-full rounded-lg border border-white/10 bg-white/[0.04] pl-8 pr-3 text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none ${
             compact ? "h-8 text-xs sm:w-56" : "h-11 text-sm"

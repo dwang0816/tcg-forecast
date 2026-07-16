@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { GAMES, GAME_BY_SLUG, isGameSlug, GameSlug } from "@/lib/games";
 import { getCardsWithoutPicturesCached, getGapCountsCached } from "@/lib/cached";
+import { getCardsWithoutPictures } from "@/lib/queries";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
+import { SearchBox } from "@/components/SearchBox";
 import { money } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 
@@ -25,17 +27,25 @@ const LIMIT = 500;
 export default async function MissingPicturesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ game?: string; show?: string }>;
+  searchParams: Promise<{ game?: string; show?: string; q?: string }>;
 }) {
   const sp = await searchParams;
   const game = sp.game && isGameSlug(sp.game) ? (sp.game as GameSlug) : undefined;
   const tracked = sp.show !== "all";
+  const term = (sp.q ?? "").trim();
 
-  const q = (over: { game?: GameSlug | null; show?: string }) => {
+  // Filter links keep the active search — switching game mid-search shouldn't
+  // silently throw the query away.
+  const href = (over: { game?: GameSlug | null; show?: string; q?: string | null }) => {
     const g = over.game === null ? undefined : (over.game ?? game);
     const s = over.show ?? (tracked ? "tracked" : "all");
-    const parts = [g ? `game=${g}` : "", s === "all" ? "show=all" : ""].filter(Boolean);
-    return "/missing-pictures" + (parts.length ? `?${parts.join("&")}` : "");
+    const t = over.q === null ? "" : (over.q ?? term);
+    const p = new URLSearchParams();
+    if (g) p.set("game", g);
+    if (s === "all") p.set("show", "all");
+    if (t) p.set("q", t);
+    const qs = p.toString();
+    return "/missing-pictures" + (qs ? `?${qs}` : "");
   };
 
   return (
@@ -55,27 +65,43 @@ export default async function MissingPicturesPage({
       {/* Filters, matching the tab pattern used everywhere else on the site. */}
       <div className="flex flex-wrap items-center gap-4">
         <nav className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
-          <Tab href={q({ game: null })} active={!game}>
+          <Tab href={href({ game: null })} active={!game}>
             All games
           </Tab>
           {GAMES.map((g) => (
-            <Tab key={g.slug} href={q({ game: g.slug })} active={game === g.slug}>
+            <Tab key={g.slug} href={href({ game: g.slug })} active={game === g.slug}>
               {g.name}
             </Tab>
           ))}
         </nav>
         <nav className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
-          <Tab href={q({ show: "tracked" })} active={tracked}>
+          <Tab href={href({ show: "tracked" })} active={tracked}>
             Tracked
           </Tab>
-          <Tab href={q({ show: "all" })} active={!tracked}>
+          <Tab href={href({ show: "all" })} active={!tracked}>
             Everything
           </Tab>
         </nav>
       </div>
 
-      <Suspense key={`${game ?? "all"}-${tracked}`} fallback={<GapsSkeleton />}>
-        <Gaps game={game} tracked={tracked} />
+      {/* Searching the query, not the rendered rows: the table is capped at the
+          500 most valuable, so a client-side filter would only ever find a card
+          already on screen — useless on a list this long. */}
+      <SearchBox
+        action="/missing-pictures"
+        defaultValue={term}
+        placeholder="Search these cards — name, set, rarity or number"
+        hidden={{
+          ...(game ? { game } : {}),
+          ...(tracked ? {} : { show: "all" }),
+        }}
+      />
+
+      <Suspense
+        key={`${game ?? "all"}-${tracked}-${term}`}
+        fallback={<GapsSkeleton />}
+      >
+        <Gaps game={game} tracked={tracked} term={term} clearHref={href({ q: null })} />
       </Suspense>
     </div>
   );
@@ -105,18 +131,32 @@ function Tab({
   );
 }
 
-async function Gaps({ game, tracked }: { game?: GameSlug; tracked: boolean }) {
+async function Gaps({
+  game,
+  tracked,
+  term,
+  clearHref,
+}: {
+  game?: GameSlug;
+  tracked: boolean;
+  term: string;
+  clearHref: string;
+}) {
   const { data, error } = await safeLoad(async () => {
-    const [rows, counts] = await Promise.all([
-      getCardsWithoutPicturesCached({ game, tracked, limit: LIMIT }),
+    const [gaps, counts] = await Promise.all([
+      // Cached only when there's no search term. unstable_cache keys on the
+      // arguments, so caching arbitrary typed text would mint a permanent entry
+      // per query — which is why searchCards isn't cached either.
+      term
+        ? getCardsWithoutPictures({ game, tracked, q: term, limit: LIMIT })
+        : getCardsWithoutPicturesCached({ game, tracked, limit: LIMIT }),
       getGapCountsCached(game),
     ]);
-    return { rows, counts };
+    return { ...gaps, counts };
   });
   if (error) return <DbErrorBanner error={error} />;
   if (!data) return null;
-  const { rows, counts } = data;
-  const shown = tracked ? counts.tracked : counts.tracked + counts.untracked;
+  const { rows, total, counts } = data;
 
   return (
     <div className="flex flex-col gap-5">
@@ -144,9 +184,37 @@ async function Gaps({ game, tracked }: { game?: GameSlug; tracked: boolean }) {
         up only graded slabs, multi-card lots, or nothing live at all.
       </p>
 
+      {term && (
+        <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-2">
+          <h2 className="text-sm font-medium text-white/70">
+            {total.toLocaleString()} card{total === 1 ? "" : "s"} without a picture
+            match <span className="text-white">&ldquo;{term}&rdquo;</span>
+          </h2>
+          <Link
+            href={clearHref}
+            className="shrink-0 text-xs text-white/40 hover:text-white/80"
+          >
+            Clear search
+          </Link>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center text-sm text-white/40">
-          Every card here has a picture. Nothing missing.
+          {/* The header above already says nothing matched, so this only has to
+              explain why and what to do about it. */}
+          {term ? (
+            <>
+              Every word has to appear somewhere on the card. Try just the name, the
+              set, or the card number — or{" "}
+              <Link href={clearHref} className="text-white/70 underline hover:text-white">
+                browse all of them
+              </Link>
+              .
+            </>
+          ) : (
+            "Every card here has a picture. Nothing missing."
+          )}
         </p>
       ) : (
         <>
@@ -216,10 +284,14 @@ async function Gaps({ game, tracked }: { game?: GameSlug; tracked: boolean }) {
             </table>
           </div>
           <p className="text-xs text-white/35">
-            {rows.length < shown
-              ? `Showing the ${rows.length} most valuable of ${shown.toLocaleString()}.`
+            {rows.length < total
+              ? `Showing the ${rows.length} most valuable of ${total.toLocaleString()}${term ? " matches" : ""}.`
               : `${rows.length.toLocaleString()} ${rows.length === 1 ? "card" : "cards"}, most valuable first.`}
-            {counts.value > 0 && ` ${money(counts.value)} of value sits in the tracked ones.`}
+            {/* The value total comes from the unsearched counts, so it would be
+                answering a question nobody asked next to a filtered table. */}
+            {!term &&
+              counts.value > 0 &&
+              ` ${money(counts.value)} of value sits in the tracked ones.`}
           </p>
         </>
       )}

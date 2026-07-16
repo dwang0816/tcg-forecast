@@ -570,34 +570,59 @@ const NO_PICTURE = sql`
 export async function getCardsWithoutPictures({
   game,
   tracked = true,
+  q,
   limit = 500,
 }: {
   game?: GameSlug;
   tracked?: boolean;
+  q?: string;
   limit?: number;
-}): Promise<GapRow[]> {
+}): Promise<{ rows: GapRow[]; total: number }> {
   const db = getDb();
   const gameFilter = game ? sql`AND game = ${game}` : sql``;
   const trackedFilter = tracked ? sql`AND tracked` : sql``;
-  const res = await db.execute(sql`
-    SELECT
-      product_id  AS "productId",
-      game        AS "game",
-      language    AS "language",
-      name        AS "name",
-      group_name  AS "groupName",
-      rarity      AS "rarity",
-      number      AS "number",
-      tracked     AS "tracked",
-      COALESCE(market_price, listing_price) AS "value",
-      (market_price IS NOT NULL)            AS "confirmed",
-      is_single   AS "isSingle"
-    FROM cards
-    WHERE ${NO_PICTURE} ${gameFilter} ${trackedFilter}
-    ORDER BY tracked DESC, COALESCE(market_price, listing_price) DESC NULLS LAST, name ASC
-    LIMIT ${limit}
-  `);
-  return rowsOf<GapRow>(res);
+
+  // Same token-AND against the generated search_text blob as the main search, so
+  // the words can come from different fields ("japanese booster", "sv2a 205")
+  // and muscle memory from /search carries over. No fuzzy fallback here: this is
+  // a filter over a list you're already looking at, and silently swapping in
+  // similar-but-different cards would undercut the one promise this page makes.
+  let termFilter = sql``;
+  for (const t of (q ?? "").toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8)) {
+    termFilter = sql`${termFilter} AND search_text LIKE ${"%" + t + "%"}`;
+  }
+
+  const where = sql`WHERE ${NO_PICTURE} ${gameFilter} ${trackedFilter} ${termFilter}`;
+
+  // total is counted under the same filters rather than derived from the headline
+  // stats — the footer has to say how many the *search* matched, not how many
+  // gaps exist.
+  const [res, countRes] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        product_id  AS "productId",
+        game        AS "game",
+        language    AS "language",
+        name        AS "name",
+        group_name  AS "groupName",
+        rarity      AS "rarity",
+        number      AS "number",
+        tracked     AS "tracked",
+        COALESCE(market_price, listing_price) AS "value",
+        (market_price IS NOT NULL)            AS "confirmed",
+        is_single   AS "isSingle"
+      FROM cards
+      ${where}
+      ORDER BY tracked DESC, COALESCE(market_price, listing_price) DESC NULLS LAST, name ASC
+      LIMIT ${limit}
+    `),
+    db.execute(sql`SELECT count(*)::int AS n FROM cards ${where}`),
+  ]);
+
+  return {
+    rows: rowsOf<GapRow>(res),
+    total: rowsOf<{ n: number }>(countRes)[0]?.n ?? 0,
+  };
 }
 
 /** Headline counts for the coverage page. */
