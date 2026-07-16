@@ -77,7 +77,10 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
         groupName: group.name,
         name: p.name,
         cleanName: p.cleanName,
-        imageUrl: p.imageUrl,
+        // Condition (runs every cron ingest): imageCount === 0 means TCGplayer
+        // has no image for this product (it 403s), so drop the broken URL and
+        // let the sibling/placeholder fallbacks take over.
+        imageUrl: p.imageCount > 0 ? p.imageUrl : null,
         url: p.url,
         rarity,
         number,
@@ -126,21 +129,29 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
     if (keep) trackedIds.add(c.productId);
   }
 
-  // Fallback images per card number: every distinct printing's image that
-  // shares a number. Variants like "(Metal) (Prize Wall)" often 404 on their own
-  // image but a sibling printing has one — the UI tries each until one loads.
-  // Ordered by productId so earlier (usually complete) printings come first.
-  const byNumber = new Map<string, string[]>();
+  // Fallback images: printings related to this card that have an image, tried
+  // by the UI until one loads. Singles group by card number (variants like
+  // "(Metal) (Prize Wall)" borrow the base printing's art); sealed products
+  // group by set (an image-less "Booster Case" borrows the set's booster box).
+  // Ordered by productId so earlier (usually complete) products come first.
+  const keyOf = (c: NewCard): string | null => {
+    if (c.number) return `n:${c.number}`;
+    if (!c.isSingle) return `g:${c.groupId}`;
+    return null; // single without a number: nothing reliable to borrow
+  };
+  const byKey = new Map<string, string[]>();
   const sorted = [...cardRows].sort((a, b) => a.productId - b.productId);
   for (const c of sorted) {
-    if (!c.number || !c.imageUrl) continue;
-    const list = byNumber.get(c.number) ?? [];
+    const k = keyOf(c);
+    if (!k || !c.imageUrl) continue;
+    const list = byKey.get(k) ?? [];
     if (!list.includes(c.imageUrl)) list.push(c.imageUrl);
-    byNumber.set(c.number, list);
+    byKey.set(k, list);
   }
   for (const c of cardRows) {
-    if (!c.number) continue;
-    const siblings = (byNumber.get(c.number) ?? [])
+    const k = keyOf(c);
+    if (!k) continue;
+    const siblings = (byKey.get(k) ?? [])
       .filter((u) => u !== c.imageUrl)
       .slice(0, 5);
     c.altImageUrls = siblings.length ? siblings : null;

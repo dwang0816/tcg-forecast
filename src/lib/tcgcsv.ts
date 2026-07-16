@@ -20,6 +20,7 @@ export interface TcgProduct {
   name: string;
   cleanName: string | null;
   imageUrl: string | null;
+  imageCount: number;
   categoryId: number;
   groupId: number;
   url: string | null;

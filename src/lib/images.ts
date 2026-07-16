@@ -4,6 +4,15 @@
 
 const OP_CODE = /^[A-Za-z0-9]+-[A-Za-z0-9]+$/;
 
+// TCGplayer serves tiny 200px thumbnails by default (blurry when displayed
+// larger). Upgrade to a crisp 1000x1000 render; keep the 200w as a backup.
+function hiRes(url: string): string {
+  return url.replace(
+    /(tcgplayer-cdn\.tcgplayer\.com\/product\/\d+)_200w\.jpg/,
+    "$1_in_1000x1000.jpg",
+  );
+}
+
 export function cardImageSources(opts: {
   game?: string | null;
   number: string | null;
@@ -15,12 +24,19 @@ export function cardImageSources(opts: {
   const push = (u: string | null | undefined) => {
     if (u && !sources.includes(u)) sources.push(u);
   };
+  // Push a TCGplayer image at high resolution first, original as a backup.
+  const pushImg = (u: string | null | undefined) => {
+    if (!u) return;
+    const hi = hiRes(u);
+    push(hi);
+    if (hi !== u) push(u);
+  };
 
-  // Primary: whatever TCGplayer gave us (may 404 for cards with no image).
-  push(opts.imageUrl);
+  // Primary: whatever TCGplayer gave us (null when imageCount was 0).
+  pushImg(opts.imageUrl);
 
   // Fallbacks: sibling printings' images for this card number.
-  for (const u of opts.altImageUrls ?? []) push(u);
+  for (const u of opts.altImageUrls ?? []) pushImg(u);
 
   // One Piece: the official card art is served by optcgapi at a predictable
   // path keyed on the card code (e.g. OP01-024 -> .../Card_Images/OP01-024.jpg).
