@@ -236,20 +236,26 @@ export async function findListingPhoto(
 ): Promise<ListingPhoto | null> {
   if (!card.number) return null;
 
-  // Build the query the way sellers actually title these, not by pasting our
-  // fields together. Sending the raw name with its punctuation —
-  // "Jhin - Virtuoso (Metal) (Prize Card) 181/219 Origins" — returns ZERO
-  // results; the same card as plain words returns 61. Parentheses and our set
-  // prefixes are noise to eBay's search, so they come out, while the words
-  // inside the parentheses stay because they name the variant.
-  const words = [
-    ...significant(baseName(card.name)),
-    ...qualifiers(card.name).flatMap(significant),
-  ];
+  // Two queries, narrow then broad, because the query's job is RECALL and
+  // matchesCard's job is PRECISION — and conflating them cost us the most
+  // valuable cards on the site.
+  //
+  // eBay ANDs every word. The narrow query below piles on the set name, the
+  // variant qualifiers and the language, and for
+  // "Irelia - Blade Dancer (Metal) (Prize Wall) 195/221" that returns ZERO
+  // results — while "irelia blade dancer 195/221" returns 142, the first page of
+  // which contains the exact card. The card was always on eBay; the query was
+  // simply too specific to find it.
+  //
+  // So: try narrow first (it ranks the right printing highest when it works),
+  // then fall back to name + number alone. Both feed the same strict matcher, so
+  // widening the net can't loosen what we accept — only what we get to consider.
   const set = card.groupName.replace(/^[A-Za-z0-9]+:\s*/, "").trim();
-  const q = [
+  const nameWords = significant(baseName(card.name));
+  const narrow = [
     ...new Set([
-      ...words,
+      ...nameWords,
+      ...qualifiers(card.name).flatMap(significant),
       card.number,
       GAME_WORD[card.game] ?? "",
       ...significant(set),
@@ -259,9 +265,28 @@ export async function findListingPhoto(
     .filter(Boolean)
     .join(" ")
     .trim();
+  const broad = [...new Set([...nameWords, card.number])].filter(Boolean).join(" ").trim();
 
+  for (const [q, limit] of [
+    [narrow, 10],
+    [broad, 25], // wider net needs more rows, since the right one ranks lower
+  ] as [string, number][]) {
+    const hit = await searchOnce(token, q, limit, card);
+    if (hit) return hit;
+    if (q === broad) break;
+  }
+  return null;
+}
+
+/** One Browse search, returning the first result our matcher accepts. */
+async function searchOnce(
+  token: string,
+  q: string,
+  limit: number,
+  card: Parameters<typeof matchesCard>[1],
+): Promise<ListingPhoto | null> {
   const url =
-    `${BROWSE}?q=${encodeURIComponent(q)}&limit=10` +
+    `${BROWSE}?q=${encodeURIComponent(q)}&limit=${limit}` +
     `&filter=${encodeURIComponent("buyingOptions:{FIXED_PRICE|AUCTION}")}`;
   const res = await fetch(url, {
     headers: {
