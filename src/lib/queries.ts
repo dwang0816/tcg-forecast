@@ -216,9 +216,10 @@ export async function getMostValuable({
   const isSingle = kind === "single";
   const basisFilter =
     basis === "confirmed"
-      ? sql`WHERE market IS NOT NULL`
-      : sql`WHERE market IS NULL AND listing IS NOT NULL`;
-  const orderCol = basis === "confirmed" ? sql.raw("market") : sql.raw("listing");
+      ? sql`WHERE "marketPrice" IS NOT NULL`
+      : sql`WHERE "marketPrice" IS NULL AND "listingPrice" IS NOT NULL`;
+  const orderCol =
+    basis === "confirmed" ? sql.raw(`"marketPrice"`) : sql.raw(`"listingPrice"`);
 
   // Return market and listing price separately so the UI can show both. Listing
   // = mid, then low, then high — TCGplayer's actual listed price, including the
@@ -228,33 +229,33 @@ export async function getMostValuable({
     WITH latest AS (SELECT max(date) AS d FROM price_snapshots),
     rows AS (
       SELECT
-        c.game, c.product_id, c.name, c.group_name, c.image_url, c.alt_image_urls,
-        c.ebay_photo_url, c.url, c.rarity, c.number, ps.sub_type_name,
-        ps.market_price AS market,
-        ps.low_price, ps.high_price,
-        COALESCE(ps.mid_price, ps.low_price, ps.high_price) AS listing
+        c.game           AS "game",
+        c.product_id     AS "productId",
+        c.name           AS "name",
+        c.group_name     AS "groupName",
+        c.image_url      AS "imageUrl",
+        c.alt_image_urls AS "altImageUrls",
+        c.ebay_photo_url AS "ebayPhotoUrl",
+        c.url            AS "url",
+        c.rarity         AS "rarity",
+        c.number         AS "number",
+        ps.sub_type_name AS "subTypeName",
+        ps.market_price  AS "marketPrice",
+        ps.low_price     AS "lowPrice",
+        ps.high_price    AS "highPrice",
+        COALESCE(ps.mid_price, ps.low_price, ps.high_price) AS "listingPrice"
       FROM price_snapshots ps
       JOIN latest ON ps.date = latest.d
       JOIN cards c ON c.product_id = ps.product_id
       WHERE c.is_single = ${isSingle} ${gameFilter} ${langFilter}
     )
-    SELECT
-      game          AS "game",
-      product_id    AS "productId",
-      name          AS "name",
-      group_name    AS "groupName",
-      image_url      AS "imageUrl",
-      alt_image_urls AS "altImageUrls",
-      ebay_photo_url AS "ebayPhotoUrl",
-      url            AS "url",
-      rarity        AS "rarity",
-      number        AS "number",
-      sub_type_name AS "subTypeName",
-      market        AS "marketPrice",
-      listing       AS "listingPrice",
-      low_price     AS "lowPrice",
-      high_price    AS "highPrice"
-    FROM rows
+    -- Columns are named once, in the CTE, and passed straight through. An earlier
+    -- version listed them again out here, which meant adding a column to one list
+    -- and not the other produced a query that only failed when someone opened the
+    -- tab. c.* can't be used instead: cards and price_snapshots share
+    -- market_price/low_price/high_price, so it would make those references
+    -- ambiguous and would shadow the snapshot prices with cards' stamped ones.
+    SELECT * FROM rows
     ${basisFilter}
     ORDER BY ${orderCol} DESC
     LIMIT ${limit}
