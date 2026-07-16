@@ -2,7 +2,15 @@
 
 import { useId, useMemo, useState } from "react";
 import { money, formatDate } from "@/lib/format";
-import type { SeriesStats } from "@/lib/cardStats";
+import { seriesStats, type SeriesStats } from "@/lib/cardStats";
+
+const RANGES: { label: string; days: number | null }[] = [
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
+  { label: "All", days: null },
+];
 
 // Validated against our dark surface (#12121a) with the dataviz validator:
 // lightness band, chroma floor, CVD separation (ΔE 15.7 worst) and contrast all pass.
@@ -33,10 +41,44 @@ const H = 300;
  * prefers-reduced-motion: no-preference, so a reader who's asked for less motion
  * gets the finished chart immediately rather than a degraded one.
  */
-export function PriceChart({ series }: { series: SeriesStats[] }) {
+export function PriceChart({ series: all }: { series: SeriesStats[] }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const uid = useId().replace(/:/g, "");
+
+  // How much history this card actually has — no point offering "1Y" on a card
+  // we've tracked for six weeks.
+  const spanDays = useMemo(() => {
+    const ds = all.flatMap((s) => s.points.map((p) => p.date)).sort();
+    if (ds.length < 2) return 0;
+    return Math.round(
+      (new Date(ds.at(-1)!).getTime() - new Date(ds[0]).getTime()) / 86_400_000,
+    );
+  }, [all]);
+
+  const choices = useMemo(
+    () => RANGES.filter((r) => r.days == null || r.days < spanDays),
+    [spanDays],
+  );
+  // Default to a year where we have one: two years of daily marks in 700px is a
+  // smear, and recent history is what a trade turns on.
+  const [range, setRange] = useState<number | null>(() =>
+    spanDays > 365 ? 365 : null,
+  );
+
+  // Recompute stats over the visible window rather than slicing the parent's —
+  // otherwise the high/low markers point at dates that aren't on screen.
+  const series = useMemo(() => {
+    if (range == null) return all;
+    const last = all.flatMap((s) => s.points.map((p) => p.date)).sort().at(-1);
+    if (!last) return all;
+    const cut = new Date(last);
+    cut.setUTCDate(cut.getUTCDate() - range);
+    const cutoff = cut.toISOString().slice(0, 10);
+    return all
+      .map((s) => seriesStats(s.label, s.points.filter((p) => p.date >= cutoff)))
+      .filter((s) => s.points.length > 0);
+  }, [all, range]);
 
   const { dates, yMin, yMax, xFor, yFor } = useMemo(() => {
     const dates = Array.from(
@@ -115,6 +157,31 @@ export function PriceChart({ series }: { series: SeriesStats[] }) {
           }
         }
       `}</style>
+
+      {choices.length > 1 && (
+        <div className="flex items-center gap-1">
+          {choices.map((r) => {
+            const active = range === r.days;
+            return (
+              <button
+                key={r.label}
+                onClick={() => {
+                  setRange(r.days);
+                  setHoverIdx(null); // indices are per-window; stale hover lies
+                }}
+                aria-pressed={active}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
+                  active
+                    ? "bg-white/15 text-white"
+                    : "text-white/45 hover:bg-white/5 hover:text-white/75"
+                }`}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
         {series.length > 1 &&
@@ -344,21 +411,42 @@ export function PriceChart({ series }: { series: SeriesStats[] }) {
             );
           })}
 
-          {/* generous hit targets — one band per day, far bigger than the mark */}
-          {dates.map((d, i) => {
-            const bandW = (W - PAD.left - PAD.right) / Math.max(1, dates.length - 1);
-            return (
-              <rect
-                key={d}
-                x={xFor(i) - bandW / 2}
-                y={PAD.top}
-                width={Math.max(bandW, 10)}
-                height={H - PAD.top - PAD.bottom}
-                fill="transparent"
-                onMouseEnter={() => setHoverIdx(i)}
-              />
-            );
-          })}
+          {/* Hit targets. One rect per day works at 45 points but becomes a 1px
+              sliver at 730 — so past that, track the pointer across a single
+              overlay and resolve to the nearest day instead. */}
+          {dates.length <= 120 ? (
+            dates.map((d, i) => {
+              const bandW = (W - PAD.left - PAD.right) / Math.max(1, dates.length - 1);
+              return (
+                <rect
+                  key={d}
+                  x={xFor(i) - bandW / 2}
+                  y={PAD.top}
+                  width={Math.max(bandW, 10)}
+                  height={H - PAD.top - PAD.bottom}
+                  fill="transparent"
+                  onMouseEnter={() => setHoverIdx(i)}
+                />
+              );
+            })
+          ) : (
+            <rect
+              x={PAD.left}
+              y={PAD.top}
+              width={W - PAD.left - PAD.right}
+              height={H - PAD.top - PAD.bottom}
+              fill="transparent"
+              onMouseMove={(e) => {
+                const svg = e.currentTarget.ownerSVGElement!;
+                const box = svg.getBoundingClientRect();
+                // Screen px -> viewBox units -> nearest day index.
+                const vx = ((e.clientX - box.left) / box.width) * W;
+                const frac = (vx - PAD.left) / (W - PAD.left - PAD.right);
+                const i = Math.round(frac * (dates.length - 1));
+                setHoverIdx(Math.min(dates.length - 1, Math.max(0, i)));
+              }}
+            />
+          )}
         </svg>
       </div>
 

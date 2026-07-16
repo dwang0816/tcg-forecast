@@ -27,6 +27,19 @@ const TIER_TONE: Record<ConfidenceTier, "good" | "warn" | "bad"> = {
  *    the only live signal there is.
  */
 
+/** How much history is behind these numbers, in words a reader can use. */
+function spanLabel(s: SeriesStats): string {
+  const ds = s.points.map((p) => p.date);
+  if (ds.length < 2) return "Range so far";
+  const days = Math.round(
+    (new Date(ds.at(-1)!).getTime() - new Date(ds[0]).getTime()) / 86_400_000,
+  );
+  if (days >= 700) return "2-year range";
+  if (days >= 350) return "52-week range";
+  if (days >= 150) return `${Math.round(days / 30)}-month range`;
+  return `Range over ${days} days`;
+}
+
 /** Where today's price sits between the period low and high. */
 function RangeBar({ s }: { s: SeriesStats }) {
   if (!s.high || !s.low || s.rangePos == null) return null;
@@ -35,7 +48,7 @@ function RangeBar({ s }: { s: SeriesStats }) {
     <div>
       <div className="flex items-baseline justify-between text-[11px] text-white/40">
         <span>Low · {formatDate(s.low.date)}</span>
-        <span className="text-white/50">Range while we&apos;ve tracked it</span>
+        <span className="text-white/50">{spanLabel(s)}</span>
         <span>High · {formatDate(s.high.date)}</span>
       </div>
       <div className="relative mt-1.5 h-1.5 rounded-full bg-gradient-to-r from-sky-500/25 via-white/15 to-emerald-500/30">
