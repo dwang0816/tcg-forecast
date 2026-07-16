@@ -130,18 +130,34 @@ export async function getMovers({
 }
 
 /** Highest current market price. Works from the very first ingest. */
+/**
+ * Most valuable cards.
+ * - basis "confirmed":   only cards with a real TCGplayer market price (an actual
+ *                        sales-based value), ranked by it. This is the honest list.
+ * - basis "unconfirmed": cards with NO market price — nobody has bought one — so
+ *                        all we have is a seller's asking price. Ranked by ask and
+ *                        shown separately so fantasy numbers can't top the list.
+ * (When eBay sold data lands, its median becomes the primary "confirmed" signal.)
+ */
 export async function getMostValuable({
   game,
   kind = "single",
   limit = 100,
+  basis = "confirmed",
 }: {
   game?: GameSlug;
   kind?: Kind;
   limit?: number;
+  basis?: "confirmed" | "unconfirmed";
 }): Promise<ValuableRow[]> {
   const db = getDb();
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const isSingle = kind === "single";
+  const basisFilter =
+    basis === "confirmed"
+      ? sql`WHERE market IS NOT NULL`
+      : sql`WHERE market IS NULL AND listing IS NOT NULL`;
+  const orderCol = basis === "confirmed" ? sql.raw("market") : sql.raw("listing");
 
   // Return market and listing price separately so the UI can show both. Listing
   // = mid, then low, then high — TCGplayer's actual listed price, including the
@@ -174,8 +190,8 @@ export async function getMostValuable({
       market        AS "marketPrice",
       listing       AS "listingPrice"
     FROM rows
-    WHERE COALESCE(market, listing) IS NOT NULL
-    ORDER BY COALESCE(market, listing) DESC
+    ${basisFilter}
+    ORDER BY ${orderCol} DESC
     LIMIT ${limit}
   `);
 

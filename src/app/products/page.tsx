@@ -1,7 +1,7 @@
 import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
-import { ValueCard } from "@/components/ValueCard";
+import { ValueSection } from "@/components/ValueSection";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -23,13 +23,14 @@ export default async function ProductsPage({
 
   // Sealed products across ALL games. minPrice raised — sealed rarely trades low.
   const { data, error } = await safeLoad(async () => {
-    const [stats, gainers, losers, valuable] = await Promise.all([
+    const [stats, gainers, losers, valuable, unconfirmed] = await Promise.all([
       getGameStats(),
       getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
       getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
-      getMostValuable({ kind: "sealed", limit: 100 }),
+      getMostValuable({ kind: "sealed", limit: 100, basis: "confirmed" }),
+      getMostValuable({ kind: "sealed", limit: 25, basis: "unconfirmed" }),
     ]);
-    return { stats, gainers, losers, valuable };
+    return { stats, gainers, losers, valuable, unconfirmed };
   });
 
   if (error || !data) {
@@ -43,7 +44,7 @@ export default async function ProductsPage({
     );
   }
 
-  const { stats, gainers, losers, valuable } = data;
+  const { stats, gainers, losers, valuable, unconfirmed } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2
@@ -84,19 +85,18 @@ export default async function ProductsPage({
         emptyBody={emptyBody}
       />
 
-      {valuable.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
-            <h2 className="text-lg font-semibold">★ Most Valuable Sealed</h2>
-            <span className="text-xs text-white/40">top {valuable.length}</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {valuable.map((row, i) => (
-              <ValueCard key={`${row.productId}-${row.subTypeName}`} row={row} rank={i + 1} />
-            ))}
-          </div>
-        </section>
-      )}
+      <ValueSection
+        title="★ Most Valuable Sealed"
+        subtitle="Ranked by confirmed TCGplayer market price — products that actually sell at this level."
+        rows={valuable}
+      />
+
+      <ValueSection
+        title="◇ Unconfirmed — asking price only"
+        subtitle="No confirmed TCGplayer sales for these, so all we have is a seller's asking price. Shown separately so they don't distort the ranking above."
+        rows={unconfirmed}
+        tone="warning"
+      />
     </div>
   );
 }

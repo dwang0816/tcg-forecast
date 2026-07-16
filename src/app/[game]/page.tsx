@@ -3,7 +3,7 @@ import { GAMES, GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
-import { ValueCard } from "@/components/ValueCard";
+import { ValueSection } from "@/components/ValueSection";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
@@ -34,13 +34,14 @@ export default async function GamePage({
   const game = GAME_BY_SLUG[slug];
 
   const { data, error } = await safeLoad(async () => {
-    const [stats, gainers, losers, valuable] = await Promise.all([
+    const [stats, gainers, losers, valuable, unconfirmed] = await Promise.all([
       getGameStats(slug),
       getMovers({ game: slug, kind: "single", windowDays, direction: "gainers", limit: 20 }),
       getMovers({ game: slug, kind: "single", windowDays, direction: "losers", limit: 20 }),
-      getMostValuable({ game: slug, kind: "single", limit: 100 }),
+      getMostValuable({ game: slug, kind: "single", limit: 100, basis: "confirmed" }),
+      getMostValuable({ game: slug, kind: "single", limit: 25, basis: "unconfirmed" }),
     ]);
-    return { stats, gainers, losers, valuable };
+    return { stats, gainers, losers, valuable, unconfirmed };
   });
 
   if (error || !data) {
@@ -55,7 +56,7 @@ export default async function GamePage({
     );
   }
 
-  const { stats, gainers, losers, valuable } = data;
+  const { stats, gainers, losers, valuable, unconfirmed } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2
@@ -95,19 +96,18 @@ export default async function GamePage({
         emptyBody={emptyBody}
       />
 
-      {valuable.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
-            <h2 className="text-lg font-semibold">★ Most Valuable</h2>
-            <span className="text-xs text-white/40">top {valuable.length}</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {valuable.map((row, i) => (
-              <ValueCard key={`${row.productId}-${row.subTypeName}`} row={row} rank={i + 1} />
-            ))}
-          </div>
-        </section>
-      )}
+      <ValueSection
+        title="★ Most Valuable"
+        subtitle="Ranked by confirmed TCGplayer market price — cards that actually sell at this level."
+        rows={valuable}
+      />
+
+      <ValueSection
+        title="◇ Unconfirmed — asking price only"
+        subtitle="Nobody has bought one of these on TCGplayer, so there's no market price. These are seller asking prices, which can be pure fantasy — shown separately so they don't distort the ranking above."
+        rows={unconfirmed}
+        tone="warning"
+      />
     </div>
   );
 }
