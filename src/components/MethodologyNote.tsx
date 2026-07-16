@@ -75,12 +75,14 @@ export function MethodologyNote({
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Rule icon="💵" title="Only real sales count">
           A price counts only if someone actually bought the card. What a seller{" "}
-          <em>hopes</em> to get doesn&apos;t count.
+          <em>hopes</em>{" "}
+          to get doesn&apos;t count.
         </Rule>
         <Rule icon="🪙" title="Cheap cards are skipped">
           A {minPrice === 5 ? "$1" : "40¢"} card going to{" "}
-          {minPrice === 5 ? "$3" : "$1.20"} is a big jump, but it isn&apos;t news.
-          We ignore anything under {money(minPrice)}.
+          {minPrice === 5 ? "$3" : "$1.20"}{" "}
+          is a big jump, but it isn&apos;t news. We ignore anything under{" "}
+          {money(minPrice)}.
         </Rule>
         <Rule icon="⚖️" title="Calm beats wild">
           If sellers can&apos;t agree what a card is worth, we trust it less and
@@ -114,8 +116,8 @@ export function MethodologyNote({
               days ago
             </code>
             <p className="mt-2">
-              Price means TCGplayer&apos;s <strong>market price</strong> — worked
-              out from real completed sales. Cards nobody has bought are left out
+              Price means TCGplayer&apos;s <strong>market price</strong>{" "}
+              — worked out from real completed sales. Cards nobody has bought are left out
               of these lists entirely; you&apos;ll find them under
               &ldquo;Unconfirmed&rdquo;. We save every tracked card&apos;s price
               once a day, and each printing (Normal, Foil…) is counted separately.
