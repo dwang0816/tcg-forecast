@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { GAMES } from "@/lib/games";
-import { getGameStats } from "@/lib/queries";
+import { getGameSummary } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const { data: stats, error } = await safeLoad(() =>
     Promise.all(
-      GAMES.map(async (g) => ({ game: g, stats: await getGameStats(g.slug) })),
+      GAMES.map(async (g) => ({ game: g, stats: await getGameSummary(g.slug) })),
     ),
   );
 

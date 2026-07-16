@@ -239,6 +239,33 @@ export interface GameStats {
   cardCount: number;
 }
 
+/**
+ * Card count and last-updated date for one game — reads `cards` only.
+ *
+ * The home page shows exactly these two numbers, one per game, and was calling
+ * getGameStats() for them: three concurrent DISTINCT-date scans over 8.6M
+ * snapshots (~770MB of reads each) to print "Updated Jul 16, 2026". They then
+ * contended for Railway's disk and the page took 8-9s in production.
+ *
+ * ingest stamps cards.price_date with the snapshot date, so max(price_date) is
+ * the same answer for ~5x less work and no snapshot access at all. Verified
+ * equal to max(price_snapshots.date) for every game.
+ *
+ * Use getGameStats() where daysOfHistory/earliestDate are genuinely needed —
+ * those can't come from `cards` and are worth their cost once per page.
+ */
+export async function getGameSummary(
+  game: GameSlug,
+): Promise<{ cardCount: number; latestDate: string | null }> {
+  const db = getDb();
+  const res = await db.execute(sql`
+    SELECT count(*)::int AS "cardCount", max(price_date)::text AS "latestDate"
+    FROM cards WHERE game = ${game}
+  `);
+  const row = rowsOf<{ cardCount: number; latestDate: string | null }>(res)[0];
+  return { cardCount: Number(row?.cardCount ?? 0), latestDate: row?.latestDate ?? null };
+}
+
 /** Coverage summary used to drive empty states and "data through" labels. */
 export async function getGameStats(
   game?: GameSlug,
