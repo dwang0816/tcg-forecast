@@ -10,7 +10,7 @@ export function GameNav() {
   const links = [
     { href: "/", label: "Home", slug: "" },
     ...GAMES.map((g) => ({ href: `/${g.slug}`, label: g.name, slug: g.slug })),
-    { href: "/products", label: "Products", slug: "products" },
+    { href: "/products", label: "Sealed Products", slug: "products" },
   ];
 
   return (
