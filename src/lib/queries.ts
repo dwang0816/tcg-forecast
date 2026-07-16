@@ -143,9 +143,10 @@ export async function getMostValuable({
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const isSingle = kind === "single";
 
-  // Return market and (sane) listing price separately so the UI can show both.
-  // Listing = mid, then low, then high, ignoring TCGplayer's >= 99999 sentinels.
-  // Rank by whichever price we have (market preferred, else listing).
+  // Return market and listing price separately so the UI can show both. Listing
+  // = mid, then low, then high — TCGplayer's actual listed price, including the
+  // $99,999-style placeholders sellers park ultra-rare grails at. Rank by
+  // whichever price we have (market preferred, else listing).
   const res = await db.execute(sql`
     WITH latest AS (SELECT max(date) AS d FROM price_snapshots),
     rows AS (
@@ -153,11 +154,7 @@ export async function getMostValuable({
         c.game, c.product_id, c.name, c.group_name, c.image_url, c.alt_image_urls,
         c.url, c.rarity, c.number, ps.sub_type_name,
         ps.market_price AS market,
-        COALESCE(
-          (CASE WHEN ps.mid_price  < 99999 THEN ps.mid_price  END),
-          (CASE WHEN ps.low_price  < 99999 THEN ps.low_price  END),
-          (CASE WHEN ps.high_price < 99999 THEN ps.high_price END)
-        ) AS listing
+        COALESCE(ps.mid_price, ps.low_price, ps.high_price) AS listing
       FROM price_snapshots ps
       JOIN latest ON ps.date = latest.d
       JOIN cards c ON c.product_id = ps.product_id
