@@ -35,7 +35,12 @@ async function main() {
   // art from any source, and only those with a number — the number is the anchor
   // that makes a match trustworthy, so cards without one are skipped entirely.
   const res = await db.execute(sql`
-    SELECT product_id, game, name, group_name, number, language, market_price
+    SELECT product_id, game, name, group_name, number, language, market_price,
+           -- Does any OTHER card of ours share this name and number? Only then
+           -- does the title need to name the set (see matchesCard).
+           (SELECT count(*) FROM cards o
+             WHERE o.game = cards.game AND o.language = cards.language
+               AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous
     FROM cards
     WHERE tracked
       AND number IS NOT NULL
@@ -54,6 +59,7 @@ async function main() {
     number: string | null;
     language: string;
     market_price: number | null;
+    ambiguous: boolean;
   }>(res);
 
   console.log(`${cards.length} cards to look up (most valuable first)\n`);
@@ -66,6 +72,7 @@ async function main() {
       number: c.number,
       groupName: c.group_name,
       language: c.language,
+      ambiguous: c.ambiguous,
     });
 
     // Stamp the timestamp either way: a miss is worth remembering so the next run

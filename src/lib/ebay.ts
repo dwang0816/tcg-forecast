@@ -136,7 +136,19 @@ function qualifiers(name: string): string[] {
  */
 export function matchesCard(
   title: string,
-  card: { name: string; number: string | null; groupName?: string; game?: string },
+  card: {
+    name: string;
+    number: string | null;
+    groupName?: string;
+    game?: string;
+    /**
+     * True when another card in our own catalog shares this name AND number —
+     * i.e. name+number does not identify a single printing. Callers must compute
+     * this; defaulting it to true would silently make the set check mandatory
+     * again, which is the safe direction to fail.
+     */
+    ambiguous?: boolean;
+  },
 ): boolean {
   if (!card.number) return false;
   const t = norm(title);
@@ -172,7 +184,7 @@ export function matchesCard(
     if (qw.length > 0 && !qw.some((w) => t.includes(w))) return false;
   }
 
-  // And the SET has to be recognisable in the title.
+  // And where it's needed, the SET has to be recognisable in the title.
   //
   // Card numbers are only unique within a set, and promos reuse the base set's
   // numbers wholesale: our "Jinx - Rebel 202/298 (Organized Play Promotional
@@ -180,10 +192,17 @@ export function matchesCard(
   // name, same number, different printing. Without this the promo wears the base
   // card's photo.
   //
+  // But it only guards against a collision that exists. When our own catalog holds
+  // exactly ONE card with this name and number, a title carrying both cannot be
+  // any other card, and demanding the set name too just rejects sellers who didn't
+  // type it. That was costing real coverage — 226 of 261 blank cards are
+  // unambiguous, and Riftbound's hit rate was 4% because its promo sets are rarely
+  // named in titles. So the check applies only where ambiguity is real.
+  //
   // The game word is excluded because it's in every title ("Riftbound" appears
   // in all of them and proves nothing), and so are words already in the card's
   // name, which would let the set check pass on the card name alone.
-  if (card.groupName) {
+  if (card.ambiguous && card.groupName) {
     const nameWords = new Set([
       ...significant(baseName(card.name)),
       ...qualifiers(card.name).flatMap(significant),
@@ -211,6 +230,8 @@ export async function findListingPhoto(
     groupName: string;
     language: string;
     game: string;
+    /** See matchesCard(): does name+number identify one printing, or several? */
+    ambiguous: boolean;
   },
 ): Promise<ListingPhoto | null> {
   if (!card.number) return null;
