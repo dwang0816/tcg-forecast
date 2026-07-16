@@ -6,9 +6,17 @@ import {
   boolean,
   doublePrecision,
   timestamp,
+  jsonb,
   primaryKey,
   index,
 } from "drizzle-orm/pg-core";
+
+/** A TCGplayer extendedData entry, e.g. { name: "HP", displayName: "HP", value: "220" }. */
+export interface ExtendedField {
+  name: string;
+  displayName: string;
+  value: string;
+}
 
 // One row per TCGplayer product (a single card, or a sealed product).
 // productId is globally unique across all games on TCGplayer.
@@ -29,6 +37,10 @@ export const cards = pgTable(
     url: text("url"), // tcgplayer product page
     rarity: text("rarity"),
     number: text("number"),
+    // The rest of TCGplayer's extendedData (card text, HP, attacks, colour, cost,
+    // power, subtypes…). It ships in the same payload we already download, and
+    // it's what makes a card page worth reading.
+    extended: jsonb("extended").$type<ExtendedField[]>(),
     // Fallback images: other printings that share this card's number. Variants
     // like "(Metal) (Prize Wall)" often lack their own TCGplayer image; the UI
     // tries these until one loads (see lib/ingest.ts).

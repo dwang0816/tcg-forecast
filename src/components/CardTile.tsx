@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { money, percent, signedMoney } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
@@ -5,6 +6,7 @@ import { CardImage } from "@/components/CardImage";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 
 export interface CardTileProps {
+  productId: number;
   rank: number;
   name: string;
   groupName: string;
@@ -28,6 +30,7 @@ export interface CardTileProps {
 }
 
 export function CardTile({
+  productId,
   rank,
   name,
   groupName,
@@ -50,10 +53,8 @@ export function CardTile({
   const sources = cardImageSources({ game: gameSlug, number, imageUrl, altImageUrls });
 
   return (
-    <a
-      href={url ?? "#"}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={`/card/${productId}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
@@ -123,6 +124,6 @@ export function CardTile({
           )}
         </div>
       </div>
-    </a>
+    </Link>
   );
 }

@@ -273,3 +273,65 @@ export async function getGameStats(
     cardCount: Number(row?.cards ?? 0),
   };
 }
+
+export interface CardDetail {
+  productId: number;
+  game: string;
+  language: string;
+  name: string;
+  groupName: string;
+  rarity: string | null;
+  number: string | null;
+  imageUrl: string | null;
+  altImageUrls: string[] | null;
+  url: string | null;
+  isSingle: boolean;
+  extended: { name: string; displayName: string; value: string }[] | null;
+}
+
+export interface HistoryPoint {
+  date: string;
+  subTypeName: string;
+  marketPrice: number | null;
+  lowPrice: number | null;
+  highPrice: number | null;
+}
+
+/** One card's metadata. Null when we don't have that product. */
+export async function getCard(productId: number): Promise<CardDetail | null> {
+  const db = getDb();
+  const res = await db.execute(sql`
+    SELECT
+      product_id     AS "productId",
+      game           AS "game",
+      language       AS "language",
+      name           AS "name",
+      group_name     AS "groupName",
+      rarity         AS "rarity",
+      number         AS "number",
+      image_url      AS "imageUrl",
+      alt_image_urls AS "altImageUrls",
+      url            AS "url",
+      is_single      AS "isSingle",
+      extended       AS "extended"
+    FROM cards WHERE product_id = ${productId} LIMIT 1
+  `);
+  return rowsOf<CardDetail>(res)[0] ?? null;
+}
+
+/** Full daily price series for a card, oldest first, one row per subtype per day. */
+export async function getCardHistory(productId: number): Promise<HistoryPoint[]> {
+  const db = getDb();
+  const res = await db.execute(sql`
+    SELECT
+      date::text       AS "date",
+      sub_type_name    AS "subTypeName",
+      market_price     AS "marketPrice",
+      low_price        AS "lowPrice",
+      high_price       AS "highPrice"
+    FROM price_snapshots
+    WHERE product_id = ${productId}
+    ORDER BY date ASC, sub_type_name ASC
+  `);
+  return rowsOf<HistoryPoint>(res);
+}

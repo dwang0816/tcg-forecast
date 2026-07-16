@@ -39,6 +39,7 @@ export function MoversSection({
           {rows.map((row, i) => (
             <CardTile
               key={`${row.productId}-${row.subTypeName}`}
+              productId={row.productId}
               rank={i + 1}
               name={row.name}
               groupName={row.groupName}

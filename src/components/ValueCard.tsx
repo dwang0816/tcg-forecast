@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { money } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
@@ -20,10 +21,8 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
   });
 
   return (
-    <a
-      href={row.url ?? "#"}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={`/card/${row.productId}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
@@ -91,7 +90,7 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
           </div>
         </div>
       </div>
-    </a>
+    </Link>
   );
 }
 

@@ -101,6 +101,11 @@ export async function ingestGame(
         url: p.url,
         rarity,
         number,
+        // Keep everything else TCGplayer gives us — it's free (same payload) and
+        // powers the card detail page.
+        extended: (p.extendedData ?? []).filter(
+          (d) => d.name !== "Rarity" && d.name !== "Number",
+        ),
         isSingle: classifyIsSingle(p.name, rarity, number),
       });
     }
@@ -191,6 +196,7 @@ export async function ingestGame(
           url: sql`excluded.url`,
           rarity: sql`excluded.rarity`,
           number: sql`excluded.number`,
+          extended: sql`excluded.extended`,
           altImageUrls: sql`excluded.alt_image_urls`,
           isSingle: sql`excluded.is_single`,
           tracked: sql`excluded.tracked`,
