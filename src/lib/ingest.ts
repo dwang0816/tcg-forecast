@@ -246,8 +246,21 @@ export async function ingestGame(
   // "(Metal) (Prize Wall)" borrow the base printing's art); sealed products
   // group by set (an image-less "Booster Case" borrows the set's booster box).
   // Ordered by productId so earlier (usually complete) products come first.
+  /**
+   * Who may lend a picture to whom.
+   *
+   * Scoped to the SET, not just the number. Card numbers are only unique within
+   * a set — "001/012" exists in dozens of them — so keying on the number alone
+   * let a card borrow art from an unrelated card that happened to share it.
+   * Blaziken 001/012 (Master Kit) was showing a picture of Burmy 001/012 (PtM:
+   * Mewtwo LV.X Collection Pack). 2,543 cards were doing this. A confidently
+   * wrong picture is worse than no picture: nobody can tell it's wrong.
+   *
+   * Same set + same number is the real sibling relationship — the separate
+   * product entries TCGplayer creates for one card's variants.
+   */
   const keyOf = (c: NewCard): string | null => {
-    if (c.number) return `n:${c.number}`;
+    if (c.number) return `n:${c.groupId}:${c.number}`;
     if (!c.isSingle) return `g:${c.groupId}`;
     return null; // single without a number: nothing reliable to borrow
   };

@@ -487,16 +487,24 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
             })
           ) : (
             <rect
-              x={PAD.left}
+              // Overhang the plot into the padding so the first and last day are
+              // reachable without pixel-perfect aim; the index is clamped anyway.
+              x={PAD.left - 16}
               y={PAD.top}
-              width={W - PAD.left - PAD.right}
+              width={W - PAD.left - PAD.right + 32}
               height={H - PAD.top - PAD.bottom}
               fill="transparent"
               onMouseMove={(e) => {
                 const svg = e.currentTarget.ownerSVGElement!;
-                const box = svg.getBoundingClientRect();
-                // Screen px -> viewBox units -> nearest day index.
-                const vx = ((e.clientX - box.left) / box.width) * W;
+                const ctm = svg.getScreenCTM();
+                if (!ctm) return;
+                // Screen px -> viewBox units -> nearest day index. Go through the
+                // CTM rather than the bounding box: preserveAspectRatio letterboxes
+                // the 760x300 viewBox inside a wider element, so box-relative math
+                // reads dead space as data and pins the hover near the middle.
+                const vx = new DOMPoint(e.clientX, e.clientY).matrixTransform(
+                  ctm.inverse(),
+                ).x;
                 const frac = (vx - PAD.left) / (W - PAD.left - PAD.right);
                 const i = Math.round(frac * (dates.length - 1));
                 setHoverIdx(Math.min(dates.length - 1, Math.max(0, i)));
