@@ -17,10 +17,11 @@ import {
 import { WindowToggle } from "@/components/WindowToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { MoversSection } from "@/components/MoversSection";
+import { MethodologyNote } from "@/components/MethodologyNote";
 import { ValueSection } from "@/components/ValueSection";
 import { ViewTabs, View, parseView, isMoversView } from "@/components/ViewTabs";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
-import { formatDate } from "@/lib/format";
+import { formatDate, daysBetween } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,20 @@ export default async function GamePage({
           <LanguageToggle language={language} makeHref={(l) => q({ lang: l })} />
         )}
       </div>
+
+      {isMoversView(view) && (
+        <MethodologyNote
+          windowDays={windowDays}
+          actualDays={
+            movers.length > 0
+              ? daysBetween(movers[0].prevDate, movers[0].latestDate)
+              : undefined
+          }
+          minPrice={2}
+          fromDate={movers.length > 0 ? formatDate(movers[0].prevDate) : undefined}
+          toDate={movers.length > 0 ? formatDate(movers[0].latestDate) : undefined}
+        />
+      )}
 
       {view === "gainers" && (
         <MoversSection
