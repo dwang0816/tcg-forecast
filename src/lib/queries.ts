@@ -343,11 +343,18 @@ export interface SearchResult extends ValuableRow {
 /**
  * Search the whole catalog — all ~71k cards, not just the tracked ones.
  *
- * Every card carries a current price (stamped on the card row each ingest), so
- * results are never dead ends. `tracked` tells the UI whether we also hold daily
- * history (and therefore a chart) for it.
+ * Every word you type must appear SOMEWHERE on the card: its name, set, rarity,
+ * number, game or language. That's what makes "cleffa obsidian" find the Cleffa
+ * from Obsidian Flames — the name holds one word and the set holds the other, so
+ * matching a single field (or the raw phrase) finds nothing. Matching is against
+ * a generated `search_text` blob with a trigram GIN index, so it stays fast.
  *
- * Matches on name (trigram-indexed) or exact card number, e.g. "OP01-024".
+ * Ranking: exact card number first, then cards whose NAME contains the whole
+ * phrase, then most valuable — which is why "cleffa obsidian" surfaces the $38.95
+ * Illustration Rare above the $0.50 common without you having to say so.
+ *
+ * If nothing matches, we retry fuzzily (trigram similarity on the name) so typos
+ * like "charzard" still land somewhere useful.
  */
 export async function searchCards({
   q,
@@ -363,51 +370,71 @@ export async function searchCards({
   kind?: Kind;
   limit?: number;
   offset?: number;
-}): Promise<{ rows: SearchResult[]; total: number }> {
+}): Promise<{ rows: SearchResult[]; total: number; fuzzy: boolean }> {
   const db = getDb();
   const term = q.trim();
-  if (!term) return { rows: [], total: 0 };
+  if (!term) return { rows: [], total: 0, fuzzy: false };
 
-  const like = `%${term}%`;
+  const tokens = term.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
   const exact = term.toUpperCase();
+  const phrase = `%${term.toLowerCase()}%`;
+
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const langFilter = language ? sql`AND c.language = ${language}` : sql``;
-  const kindFilter =
-    kind ? sql`AND c.is_single = ${kind === "single"}` : sql``;
+  const kindFilter = kind ? sql`AND c.is_single = ${kind === "single"}` : sql``;
 
-  const where = sql`
-    WHERE (c.name ILIKE ${like} OR upper(c.number) = ${exact})
-    ${gameFilter} ${langFilter} ${kindFilter}`;
+  // Every token must appear somewhere on the card.
+  let tokenWhere = sql`TRUE`;
+  for (const t of tokens) {
+    tokenWhere = sql`${tokenWhere} AND c.search_text LIKE ${"%" + t + "%"}`;
+  }
 
-  const countRes = await db.execute(sql`
-    SELECT count(*)::int AS n FROM cards c ${where}`);
+  const SELECT = sql`
+    c.game            AS "game",
+    c.product_id      AS "productId",
+    c.name            AS "name",
+    c.group_name      AS "groupName",
+    c.image_url       AS "imageUrl",
+    c.alt_image_urls  AS "altImageUrls",
+    c.url             AS "url",
+    c.rarity          AS "rarity",
+    c.number          AS "number",
+    'Normal'          AS "subTypeName",
+    c.market_price    AS "marketPrice",
+    c.listing_price   AS "listingPrice",
+    c.low_price       AS "lowPrice",
+    c.high_price      AS "highPrice",
+    c.tracked         AS "tracked"`;
+
+  const where = sql`WHERE ${tokenWhere} ${gameFilter} ${langFilter} ${kindFilter}`;
+
+  const countRes = await db.execute(sql`SELECT count(*)::int AS n FROM cards c ${where}`);
   const total = rowsOf<{ n: number }>(countRes)[0]?.n ?? 0;
 
-  const res = await db.execute(sql`
-    SELECT
-      c.game            AS "game",
-      c.product_id      AS "productId",
-      c.name            AS "name",
-      c.group_name      AS "groupName",
-      c.image_url       AS "imageUrl",
-      c.alt_image_urls  AS "altImageUrls",
-      c.url             AS "url",
-      c.rarity          AS "rarity",
-      c.number          AS "number",
-      'Normal'          AS "subTypeName",
-      c.market_price    AS "marketPrice",
-      c.listing_price   AS "listingPrice",
-      c.low_price       AS "lowPrice",
-      c.high_price      AS "highPrice",
-      c.tracked         AS "tracked"
-    FROM cards c
-    ${where}
-    ORDER BY
-      (upper(c.number) = ${exact}) DESC,     -- exact card code first
-      COALESCE(c.market_price, c.listing_price) DESC NULLS LAST,
-      c.name ASC
-    LIMIT ${limit} OFFSET ${offset}
-  `);
+  if (total > 0) {
+    const res = await db.execute(sql`
+      SELECT ${SELECT}
+      FROM cards c
+      ${where}
+      ORDER BY
+        (upper(c.number) = ${exact}) DESC,
+        (lower(c.name) LIKE ${phrase}) DESC,
+        COALESCE(c.market_price, c.listing_price) DESC NULLS LAST,
+        c.name ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+    return { rows: rowsOf<SearchResult>(res), total, fuzzy: false };
+  }
 
-  return { rows: rowsOf<SearchResult>(res), total };
+  // Nothing matched — fall back to fuzzy name matching so typos still land.
+  const fuzzyRes = await db.execute(sql`
+    SELECT ${SELECT}
+    FROM cards c
+    WHERE similarity(c.name, ${term}) > 0.25 ${gameFilter} ${langFilter} ${kindFilter}
+    ORDER BY similarity(c.name, ${term}) DESC,
+             COALESCE(c.market_price, c.listing_price) DESC NULLS LAST
+    LIMIT ${limit}
+  `);
+  const rows = rowsOf<SearchResult>(fuzzyRes);
+  return { rows, total: rows.length, fuzzy: rows.length > 0 };
 }

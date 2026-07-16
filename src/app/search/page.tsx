@@ -52,7 +52,9 @@ export default async function SearchPage({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Search cards</h1>
         <p className="mt-1 text-sm text-white/45">
-          Every card we track — search by name or card number (e.g. OP01-024).
+          Search by anything on the card — name, set, rarity or number. Words can
+          come from different fields: &ldquo;cleffa obsidian&rdquo;, &ldquo;charizard
+          illustration rare&rdquo;, &ldquo;OP01-024&rdquo;.
         </p>
       </div>
 
@@ -87,7 +89,8 @@ export default async function SearchPage({
 
       {!q && (
         <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-12 text-center text-sm text-white/40">
-          Type a card name or number above to search all 71,000+ cards.
+          Search all 71,000+ cards. Mix any keywords you like — card name, set,
+          rarity, number — e.g. &ldquo;cleffa obsidian&rdquo; or &ldquo;luffy manga&rdquo;.
         </p>
       )}
 
@@ -95,8 +98,18 @@ export default async function SearchPage({
         <>
           <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
             <h2 className="text-sm font-medium text-white/70">
-              {total.toLocaleString()} result{total === 1 ? "" : "s"} for{" "}
-              <span className="text-white">&ldquo;{q}&rdquo;</span>
+              {data.fuzzy ? (
+                <>
+                  No exact match for{" "}
+                  <span className="text-white">&ldquo;{q}&rdquo;</span> — showing{" "}
+                  {total} similar
+                </>
+              ) : (
+                <>
+                  {total.toLocaleString()} result{total === 1 ? "" : "s"} for{" "}
+                  <span className="text-white">&ldquo;{q}&rdquo;</span>
+                </>
+              )}
             </h2>
             {pages > 1 && (
               <span className="text-xs text-white/40">page {page} of {pages}</span>
