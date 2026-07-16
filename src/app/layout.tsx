@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { GameNav } from "@/components/GameNav";
@@ -46,6 +47,13 @@ export default function RootLayout({
           </a>{" "}
           (TCGplayer market prices), updated daily. Not affiliated with TCGplayer,
           The Pokémon Company, Bandai, or Riot Games.
+          {/* The nav link is desktop-only, so this is how phones reach it — and
+              a coverage page belongs next to the data provenance anyway. */}
+          <span className="mt-1 block">
+            <Link href="/missing-pictures" className="underline hover:text-white/50">
+              Cards we don&apos;t have pictures for
+            </Link>
+          </span>
         </footer>
       </body>
     </html>

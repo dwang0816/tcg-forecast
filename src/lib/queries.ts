@@ -530,3 +530,92 @@ export async function searchCards({
   const rows = rowsOf<SearchResult>(fuzzyRes);
   return { rows, total: rows.length, fuzzy: rows.length > 0 };
 }
+
+export interface GapRow {
+  productId: number;
+  game: string;
+  language: string;
+  name: string;
+  groupName: string;
+  rarity: string | null;
+  number: string | null;
+  tracked: boolean;
+  value: number | null;
+  confirmed: boolean;
+  isSingle: boolean;
+}
+
+export interface GapCounts {
+  tracked: number;
+  untracked: number;
+  noNumber: number;
+  searched: number;
+  value: number;
+}
+
+/**
+ * Cards we have no picture for: no TCGplayer art, nothing to borrow from a
+ * sibling printing in the same set, and no eBay listing photo.
+ *
+ * Kept as an honest public page rather than a private checklist. This is a site
+ * people quote prices from, and "we don't have a picture of this one" is worth
+ * saying out loud — the alternative is a reader assuming the blank is a bug, or
+ * worse, us papering over it with a picture of some other card.
+ */
+const NO_PICTURE = sql`
+  image_url IS NULL
+  AND (alt_image_urls IS NULL OR array_length(alt_image_urls, 1) = 0)
+  AND ebay_photo_url IS NULL`;
+
+export async function getCardsWithoutPictures({
+  game,
+  tracked = true,
+  limit = 500,
+}: {
+  game?: GameSlug;
+  tracked?: boolean;
+  limit?: number;
+}): Promise<GapRow[]> {
+  const db = getDb();
+  const gameFilter = game ? sql`AND game = ${game}` : sql``;
+  const trackedFilter = tracked ? sql`AND tracked` : sql``;
+  const res = await db.execute(sql`
+    SELECT
+      product_id  AS "productId",
+      game        AS "game",
+      language    AS "language",
+      name        AS "name",
+      group_name  AS "groupName",
+      rarity      AS "rarity",
+      number      AS "number",
+      tracked     AS "tracked",
+      COALESCE(market_price, listing_price) AS "value",
+      (market_price IS NOT NULL)            AS "confirmed",
+      is_single   AS "isSingle"
+    FROM cards
+    WHERE ${NO_PICTURE} ${gameFilter} ${trackedFilter}
+    ORDER BY tracked DESC, COALESCE(market_price, listing_price) DESC NULLS LAST, name ASC
+    LIMIT ${limit}
+  `);
+  return rowsOf<GapRow>(res);
+}
+
+/** Headline counts for the coverage page. */
+export async function getGapCounts(game?: GameSlug): Promise<GapCounts> {
+  const db = getDb();
+  const gameFilter = game ? sql`AND game = ${game}` : sql``;
+  const res = await db.execute(sql`
+    SELECT
+      count(*) FILTER (WHERE tracked)::int      AS "tracked",
+      count(*) FILTER (WHERE NOT tracked)::int  AS "untracked",
+      -- No card number means no eBay match is ever attempted: there's nothing to
+      -- anchor on. Every sealed product is in here by nature.
+      count(*) FILTER (WHERE tracked AND number IS NULL)::int     AS "noNumber",
+      count(*) FILTER (WHERE tracked AND number IS NOT NULL)::int AS "searched",
+      COALESCE(sum(COALESCE(market_price, listing_price)) FILTER (WHERE tracked), 0)::float AS "value"
+    FROM cards
+    WHERE ${NO_PICTURE} ${gameFilter}
+  `);
+  const r = rowsOf<GapCounts>(res)[0];
+  return r ?? { tracked: 0, untracked: 0, noNumber: 0, searched: 0, value: 0 };
+}

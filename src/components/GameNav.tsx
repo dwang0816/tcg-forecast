@@ -41,24 +41,40 @@ export function GameNav() {
           })}
         </div>
 
-        {/* A labelled destination rather than a bare input: a lone search box
-            doesn't tell anyone WHAT it searches. This says where to go to look
-            up one specific card's price and details. */}
-        <Link
-          href="/search"
-          aria-current={pathname === "/search" ? "page" : undefined}
-          className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-            pathname === "/search"
-              ? "border-white/25 bg-white/10 text-white"
-              : "border-white/10 text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
-          }`}
-        >
-          <span aria-hidden className="text-base leading-none">
-            ⌕
-          </span>
-          <span className="hidden sm:inline">Look up a card</span>
-          <span className="sm:hidden">Search</span>
-        </Link>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {/* Quieter than the games and the search button on purpose: it's a
+              reference page for the curious, not somewhere to send people first. */}
+          <Link
+            href="/missing-pictures"
+            aria-current={pathname === "/missing-pictures" ? "page" : undefined}
+            className={`hidden rounded-full px-3 py-1.5 text-sm font-medium transition-colors md:inline ${
+              pathname === "/missing-pictures"
+                ? "bg-white/10 text-white"
+                : "text-white/40 hover:bg-white/5 hover:text-white/70"
+            }`}
+          >
+            Missing pictures
+          </Link>
+
+          {/* A labelled destination rather than a bare input: a lone search box
+              doesn't tell anyone WHAT it searches. This says where to go to look
+              up one specific card's price and details. */}
+          <Link
+            href="/search"
+            aria-current={pathname === "/search" ? "page" : undefined}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+              pathname === "/search"
+                ? "border-white/25 bg-white/10 text-white"
+                : "border-white/10 text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <span aria-hidden className="text-base leading-none">
+              ⌕
+            </span>
+            <span className="hidden sm:inline">Look up a card</span>
+            <span className="sm:hidden">Search</span>
+          </Link>
+        </div>
       </nav>
     </header>
   );

@@ -1,5 +1,12 @@
 import { unstable_cache } from "next/cache";
-import { getMovers, getMostValuable, getGameStats, getGameSummary } from "./queries";
+import {
+  getMovers,
+  getMostValuable,
+  getGameStats,
+  getGameSummary,
+  getCardsWithoutPictures,
+  getGapCounts,
+} from "./queries";
 
 /**
  * Cached reads for the browsing pages.
@@ -46,6 +53,17 @@ export const getGameStatsCached = unstable_cache(getGameStats, ["game-stats"], {
 });
 
 export const getGameSummaryCached = unstable_cache(getGameSummary, ["game-summary"], {
+  tags: [PRICES_TAG],
+  revalidate: ONE_DAY,
+});
+
+export const getCardsWithoutPicturesCached = unstable_cache(
+  getCardsWithoutPictures,
+  ["cards-without-pictures"],
+  { tags: [PRICES_TAG], revalidate: ONE_DAY },
+);
+
+export const getGapCountsCached = unstable_cache(getGapCounts, ["gap-counts"], {
   tags: [PRICES_TAG],
   revalidate: ONE_DAY,
 });
