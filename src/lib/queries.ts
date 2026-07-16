@@ -349,9 +349,12 @@ export interface SearchResult extends ValuableRow {
  * matching a single field (or the raw phrase) finds nothing. Matching is against
  * a generated `search_text` blob with a trigram GIN index, so it stays fast.
  *
- * Ranking: exact card number first, then cards whose NAME contains the whole
- * phrase, then most valuable — which is why "cleffa obsidian" surfaces the $38.95
- * Illustration Rare above the $0.50 common without you having to say so.
+ * Ranking is by VALUE, matching the Most Valuable lists: confirmed TCGplayer
+ * market price first, then ask-only cards by their listing price. This app is
+ * about value, and the token matching above already narrows things — someone
+ * hunting one specific card types its name and gets it either way. Ranking by
+ * market price (not by any price) also stops the $99,999-style asks from
+ * crowning results, exactly as in the rankings.
  *
  * If nothing matches, we retry fuzzily (trigram similarity on the name) so typos
  * like "charzard" still land somewhere useful.
@@ -376,9 +379,6 @@ export async function searchCards({
   if (!term) return { rows: [], total: 0, fuzzy: false };
 
   const tokens = term.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
-  const exact = term.toUpperCase();
-  const phrase = `%${term.toLowerCase()}%`;
-
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const langFilter = language ? sql`AND c.language = ${language}` : sql``;
   const kindFilter = kind ? sql`AND c.is_single = ${kind === "single"}` : sql``;
@@ -417,9 +417,8 @@ export async function searchCards({
       FROM cards c
       ${where}
       ORDER BY
-        (upper(c.number) = ${exact}) DESC,
-        (lower(c.name) LIKE ${phrase}) DESC,
-        COALESCE(c.market_price, c.listing_price) DESC NULLS LAST,
+        c.market_price DESC NULLS LAST,
+        c.listing_price DESC NULLS LAST,
         c.name ASC
       LIMIT ${limit} OFFSET ${offset}
     `);
