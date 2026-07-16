@@ -77,6 +77,27 @@ const SQL_CONFIDENCE = sql`
  * have and reports the real `prevDate`, so the UI can label the true period.
  * `minPrice` filters out cheap items whose percentage swings are just noise.
  */
+/**
+ * How far before the target date getMovers will accept a "previous" price.
+ *
+ * Load-bearing in two ways. Without a lower bound, the prev CTE's date <= target
+ * selects the entire history back to 2024 — 8.5M rows for DISTINCT ON to sort,
+ * which took 12 seconds. That was invisible when we held 45 days of snapshots.
+ *
+ * It's also a correctness fix. Unbounded, a card whose nearest earlier snapshot
+ * was a year old got compared against that price and the result labelled a
+ * "7-day change". Snapshots are daily, so a gap that big means we have no honest
+ * basis for comparison and the card belongs out of the list — not in it with a
+ * fabricated percentage.
+ *
+ * 3 days, measured rather than guessed. On a 7-day window it covers a missed cron
+ * run with room to spare, and buys everything a wider bound does: at 3 days 876
+ * One Piece singles are eligible, at 14 days 878 — and both extra cards are ones
+ * whose "7-day" change was really measured over 8+ days. The tolerance past a few
+ * days adds no coverage, only overstated windows.
+ */
+const PREV_LOOKBACK_DAYS = 3;
+
 export async function getMovers({
   game,
   language,
@@ -115,11 +136,15 @@ export async function getMovers({
       FROM price_snapshots ps, tgt
       WHERE ps.date = tgt.latest AND ps.market_price IS NOT NULL
     ),
+    -- The newest snapshot at or before the target date, per card+printing.
+    -- (See PREV_LOOKBACK_DAYS above for why the lower bound matters.)
     prev AS (
       SELECT DISTINCT ON (ps.product_id, ps.sub_type_name)
         ps.product_id, ps.sub_type_name, ps.market_price, ps.date
       FROM price_snapshots ps, tgt
-      WHERE ps.date <= tgt.target AND ps.market_price IS NOT NULL
+      WHERE ps.date <= tgt.target
+        AND ps.date >= (tgt.target - make_interval(days => ${PREV_LOOKBACK_DAYS}))::date
+        AND ps.market_price IS NOT NULL
       ORDER BY ps.product_id, ps.sub_type_name, ps.date DESC
     )
     SELECT
