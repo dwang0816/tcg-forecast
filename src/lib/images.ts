@@ -1,0 +1,28 @@
+// Builds an ordered list of candidate image URLs for a card. The UI tries them
+// in order, falling back to the next when one fails to load, so cards missing a
+// TCGplayer image can still show art from a secondary source.
+
+const OP_CODE = /^[A-Za-z0-9]+-[A-Za-z0-9]+$/;
+
+export function cardImageSources(opts: {
+  game?: string | null;
+  number: string | null;
+  imageUrl: string | null;
+}): string[] {
+  const sources: string[] = [];
+
+  // Primary: whatever TCGplayer gave us (may 404 for cards with no image).
+  if (opts.imageUrl) sources.push(opts.imageUrl);
+
+  // One Piece: the official card art is served by optcgapi at a predictable
+  // path keyed on the card code (e.g. OP01-024 -> .../Card_Images/OP01-024.jpg).
+  if (opts.game === "onepiece" && opts.number) {
+    const code = opts.number.trim().toUpperCase();
+    if (OP_CODE.test(code)) {
+      const url = `https://optcgapi.com/media/static/Card_Images/${code}.jpg`;
+      if (!sources.includes(url)) sources.push(url);
+    }
+  }
+
+  return sources;
+}

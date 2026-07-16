@@ -1,5 +1,7 @@
 import { money, percent, signedMoney } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
+import { cardImageSources } from "@/lib/images";
+import { CardImage } from "@/components/CardImage";
 
 export interface CardTileProps {
   rank: number;
@@ -12,8 +14,10 @@ export interface CardTileProps {
   number: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
-  /** When set, shows a small game badge (used in cross-game views). */
+  /** Game slug — used to source fallback images and (with showBadge) the label. */
   gameSlug?: string;
+  /** Show the game badge (cross-game views only). */
+  showBadge?: boolean;
 }
 
 export function CardTile({
@@ -24,12 +28,15 @@ export function CardTile({
   url,
   subTypeName,
   rarity,
+  number,
   price,
   change,
   gameSlug,
+  showBadge = false,
 }: CardTileProps) {
   const up = change ? change.pct >= 0 : false;
   const game = gameSlug && isGameSlug(gameSlug) ? GAME_BY_SLUG[gameSlug] : null;
+  const sources = cardImageSources({ game: gameSlug, number, imageUrl });
 
   return (
     <a
@@ -39,19 +46,7 @@ export function CardTile({
       className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
     >
       <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={name}
-            loading="lazy"
-            className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-white/30">
-            No image
-          </div>
-        )}
+        <CardImage sources={sources} alt={name} />
 
         <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white/80 backdrop-blur">
           #{rank}
@@ -63,7 +58,7 @@ export function CardTile({
           </span>
         )}
 
-        {game && (
+        {showBadge && game && (
           <span
             className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
           >

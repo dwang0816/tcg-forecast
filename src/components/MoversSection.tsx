@@ -49,7 +49,8 @@ export function MoversSection({
               number={row.number}
               price={row.curPrice}
               change={{ pct: row.pctChange, abs: row.absChange }}
-              gameSlug={showGameBadge ? row.game : undefined}
+              gameSlug={row.game}
+              showBadge={showGameBadge}
             />
           ))}
         </div>

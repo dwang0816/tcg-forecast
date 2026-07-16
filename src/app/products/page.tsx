@@ -103,6 +103,7 @@ export default async function ProductsPage({
                 number={row.number}
                 price={row.curPrice}
                 gameSlug={row.game}
+                showBadge
               />
             ))}
           </div>
