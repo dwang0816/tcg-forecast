@@ -43,6 +43,7 @@ export function MoversSection({
               name={row.name}
               groupName={row.groupName}
               imageUrl={row.imageUrl}
+              altImageUrls={row.altImageUrls}
               url={row.url}
               subTypeName={row.subTypeName}
               rarity={row.rarity}

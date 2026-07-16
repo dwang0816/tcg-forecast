@@ -1,0 +1,1 @@
+ALTER TABLE "cards" ADD COLUMN "alt_image_urls" text[];

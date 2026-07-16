@@ -8,19 +8,26 @@ export function cardImageSources(opts: {
   game?: string | null;
   number: string | null;
   imageUrl: string | null;
+  /** Images from sibling printings that share this card's number. */
+  altImageUrls?: string[] | null;
 }): string[] {
   const sources: string[] = [];
+  const push = (u: string | null | undefined) => {
+    if (u && !sources.includes(u)) sources.push(u);
+  };
 
   // Primary: whatever TCGplayer gave us (may 404 for cards with no image).
-  if (opts.imageUrl) sources.push(opts.imageUrl);
+  push(opts.imageUrl);
+
+  // Fallbacks: sibling printings' images for this card number.
+  for (const u of opts.altImageUrls ?? []) push(u);
 
   // One Piece: the official card art is served by optcgapi at a predictable
   // path keyed on the card code (e.g. OP01-024 -> .../Card_Images/OP01-024.jpg).
   if (opts.game === "onepiece" && opts.number) {
     const code = opts.number.trim().toUpperCase();
     if (OP_CODE.test(code)) {
-      const url = `https://optcgapi.com/media/static/Card_Images/${code}.jpg`;
-      if (!sources.includes(url)) sources.push(url);
+      push(`https://optcgapi.com/media/static/Card_Images/${code}.jpg`);
     }
   }
 

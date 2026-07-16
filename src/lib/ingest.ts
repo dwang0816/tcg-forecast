@@ -126,6 +126,26 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
     if (keep) trackedIds.add(c.productId);
   }
 
+  // Fallback images per card number: every distinct printing's image that
+  // shares a number. Variants like "(Metal) (Prize Wall)" often 404 on their own
+  // image but a sibling printing has one — the UI tries each until one loads.
+  // Ordered by productId so earlier (usually complete) printings come first.
+  const byNumber = new Map<string, string[]>();
+  const sorted = [...cardRows].sort((a, b) => a.productId - b.productId);
+  for (const c of sorted) {
+    if (!c.number || !c.imageUrl) continue;
+    const list = byNumber.get(c.number) ?? [];
+    if (!list.includes(c.imageUrl)) list.push(c.imageUrl);
+    byNumber.set(c.number, list);
+  }
+  for (const c of cardRows) {
+    if (!c.number) continue;
+    const siblings = (byNumber.get(c.number) ?? [])
+      .filter((u) => u !== c.imageUrl)
+      .slice(0, 5);
+    c.altImageUrls = siblings.length ? siblings : null;
+  }
+
   // Upsert cards (metadata can change: new rarity data, renamed presale, etc.)
   for (const batch of chunk(cardRows, 500)) {
     await db
@@ -141,6 +161,7 @@ export async function ingestGame(game: Game, date = utcDate()): Promise<IngestRe
           url: sql`excluded.url`,
           rarity: sql`excluded.rarity`,
           number: sql`excluded.number`,
+          altImageUrls: sql`excluded.alt_image_urls`,
           isSingle: sql`excluded.is_single`,
           tracked: sql`excluded.tracked`,
           updatedAt: sql`now()`,

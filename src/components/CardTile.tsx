@@ -8,6 +8,7 @@ export interface CardTileProps {
   name: string;
   groupName: string;
   imageUrl: string | null;
+  altImageUrls?: string[] | null;
   url: string | null;
   subTypeName: string;
   rarity: string | null;
@@ -27,6 +28,7 @@ export function CardTile({
   name,
   groupName,
   imageUrl,
+  altImageUrls,
   url,
   subTypeName,
   rarity,
@@ -39,7 +41,7 @@ export function CardTile({
 }: CardTileProps) {
   const up = change ? change.pct >= 0 : false;
   const game = gameSlug && isGameSlug(gameSlug) ? GAME_BY_SLUG[gameSlug] : null;
-  const sources = cardImageSources({ game: gameSlug, number, imageUrl });
+  const sources = cardImageSources({ game: gameSlug, number, imageUrl, altImageUrls });
 
   return (
     <a

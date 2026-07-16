@@ -15,6 +15,7 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank: number }) {
     game: row.game,
     number: row.number,
     imageUrl: row.imageUrl,
+    altImageUrls: row.altImageUrls,
   });
 
   return (

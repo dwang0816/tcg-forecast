@@ -26,6 +26,10 @@ export const cards = pgTable(
     url: text("url"), // tcgplayer product page
     rarity: text("rarity"),
     number: text("number"),
+    // Fallback images: other printings that share this card's number. Variants
+    // like "(Metal) (Prize Wall)" often lack their own TCGplayer image; the UI
+    // tries these until one loads (see lib/ingest.ts).
+    altImageUrls: text("alt_image_urls").array(),
     // true = individual card ("single"); false = sealed product (box/pack/deck)
     isSingle: boolean("is_single").notNull().default(false),
     // true = valuable enough to snapshot prices for (see lib/tracking.ts)

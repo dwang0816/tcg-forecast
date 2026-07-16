@@ -15,6 +15,13 @@
       "when": 1784175768699,
       "tag": "0001_daily_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784177421077,
+      "tag": "0002_blushing_maelstrom",
+      "breakpoints": true
     }
   ]
 }

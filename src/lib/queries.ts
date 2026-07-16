@@ -11,6 +11,7 @@ export interface MoverRow {
   name: string;
   groupName: string;
   imageUrl: string | null;
+  altImageUrls: string[] | null;
   url: string | null;
   rarity: string | null;
   number: string | null;
@@ -29,6 +30,7 @@ export interface ValuableRow {
   name: string;
   groupName: string;
   imageUrl: string | null;
+  altImageUrls: string[] | null;
   url: string | null;
   rarity: string | null;
   number: string | null;
@@ -101,6 +103,7 @@ export async function getMovers({
       c.name            AS "name",
       c.group_name      AS "groupName",
       c.image_url       AS "imageUrl",
+      c.alt_image_urls  AS "altImageUrls",
       c.url             AS "url",
       c.rarity          AS "rarity",
       c.number          AS "number",
@@ -147,8 +150,8 @@ export async function getMostValuable({
     WITH latest AS (SELECT max(date) AS d FROM price_snapshots),
     rows AS (
       SELECT
-        c.game, c.product_id, c.name, c.group_name, c.image_url, c.url,
-        c.rarity, c.number, ps.sub_type_name,
+        c.game, c.product_id, c.name, c.group_name, c.image_url, c.alt_image_urls,
+        c.url, c.rarity, c.number, ps.sub_type_name,
         ps.market_price AS market,
         COALESCE(
           (CASE WHEN ps.mid_price  < 99999 THEN ps.mid_price  END),
@@ -165,8 +168,9 @@ export async function getMostValuable({
       product_id    AS "productId",
       name          AS "name",
       group_name    AS "groupName",
-      image_url     AS "imageUrl",
-      url           AS "url",
+      image_url      AS "imageUrl",
+      alt_image_urls AS "altImageUrls",
+      url            AS "url",
       rarity        AS "rarity",
       number        AS "number",
       sub_type_name AS "subTypeName",
