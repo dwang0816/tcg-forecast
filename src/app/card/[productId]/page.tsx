@@ -4,10 +4,11 @@ import { getCard, getCardHistory } from "@/lib/queries";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
-import { PriceChart, Series } from "@/components/PriceChart";
-import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { PriceChart } from "@/components/PriceChart";
+import { CardPriceHeadline, CardPriceFacts } from "@/components/CardPriceStats";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
-import { money, percent, formatDate } from "@/lib/format";
+import { statsByPrinting } from "@/lib/cardStats";
+import { formatDate } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
@@ -58,33 +59,10 @@ export default async function CardPage({
     altImageUrls: card.altImageUrls,
   });
 
-  // Build one series per printing, keeping only days with a real market price.
-  const bySub = new Map<string, Series>();
-  for (const h of history) {
-    if (h.marketPrice == null) continue;
-    const s = bySub.get(h.subTypeName) ?? { label: h.subTypeName, points: [] };
-    s.points.push({
-      date: h.date,
-      price: h.marketPrice,
-      low: h.lowPrice,
-      high: h.highPrice,
-    });
-    bySub.set(h.subTypeName, s);
-  }
-  const series = [...bySub.values()].filter((s) => s.points.length > 0);
-
-  // Headline: latest market price, and its change over the window we hold.
-  const primary = series.sort((a, b) => b.points.length - a.points.length)[0];
-  const latest = primary?.points.at(-1);
-  const first = primary?.points[0];
-  const change =
-    latest && first && first.price > 0
-      ? (latest.price - first.price) / first.price
-      : null;
-
-  const latestRow = [...history]
-    .reverse()
-    .find((h) => h.subTypeName === primary?.label);
+  // Keep every day, including ones with no sale: a gap in the market price IS
+  // the signal on a thin card, and the asking band still has something to say.
+  const series = statsByPrinting(history);
+  const primary = series[0] ?? null;
 
   const extended = (card.extended ?? []).filter((f) => f.value?.trim());
   const prose = extended.filter((f) => PROSE_FIELDS.has(f.name));
@@ -131,49 +109,14 @@ export default async function CardPage({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div>
-              <div className="text-xs text-white/40">Market price</div>
-              <div className="text-3xl font-semibold text-white">
-                {latest ? money(latest.price) : "N/A"}
-              </div>
-              {!latest && (
-                <div className="mt-1 text-xs text-amber-400/80">
-                  no confirmed sales — asking price only
-                </div>
-              )}
-            </div>
-            {change != null && first && (
-              <div>
-                <div className="text-xs text-white/40">
-                  since {formatDate(first.date)}
-                </div>
-                <div
-                  className={`text-lg font-semibold tabular-nums ${
-                    change >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {percent(change)}
-                </div>
-              </div>
-            )}
-            {latestRow && (
-              <div>
-                <div className="text-xs text-white/40">Listings</div>
-                <div className="text-sm tabular-nums text-white/70">
-                  {latestRow.lowPrice != null && latestRow.highPrice != null
-                    ? `${money(latestRow.lowPrice)} – ${money(latestRow.highPrice)}`
-                    : "—"}
-                </div>
-                <div className="mt-1">
-                  <ConfidenceBadge
-                    low={latestRow.lowPrice}
-                    high={latestRow.highPrice}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          {primary ? (
+            <CardPriceHeadline s={primary} />
+          ) : (
+            <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm text-white/40">
+              We haven&apos;t recorded a price for this one yet. It&apos;ll appear
+              after the next daily update.
+            </p>
+          )}
 
           {card.url && (
             <a
@@ -188,10 +131,14 @@ export default async function CardPage({
         </div>
       </div>
 
+      {/* The at-a-glance strip wants the full width — 4 columns don't fit beside
+          the image, and these are the numbers people scan before the chart. */}
+      {primary && <CardPriceFacts s={primary} />}
+
       {/* Chart */}
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-          <h2 className="text-lg font-semibold">Market price over time</h2>
+          <h2 className="text-lg font-semibold">Price history</h2>
           <span className="text-xs text-white/40">
             {history.length > 0
               ? `daily snapshots · ${formatDate(history[0].date)} → ${formatDate(history[history.length - 1].date)}`

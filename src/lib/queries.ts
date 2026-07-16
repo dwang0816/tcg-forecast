@@ -294,7 +294,9 @@ export interface HistoryPoint {
   subTypeName: string;
   marketPrice: number | null;
   lowPrice: number | null;
+  midPrice: number | null;
   highPrice: number | null;
+  directLowPrice: number | null;
 }
 
 /** One card's metadata. Null when we don't have that product. */
@@ -324,11 +326,13 @@ export async function getCardHistory(productId: number): Promise<HistoryPoint[]>
   const db = getDb();
   const res = await db.execute(sql`
     SELECT
-      date::text       AS "date",
-      sub_type_name    AS "subTypeName",
-      market_price     AS "marketPrice",
-      low_price        AS "lowPrice",
-      high_price       AS "highPrice"
+      date::text        AS "date",
+      sub_type_name     AS "subTypeName",
+      market_price      AS "marketPrice",
+      low_price         AS "lowPrice",
+      mid_price         AS "midPrice",
+      high_price        AS "highPrice",
+      direct_low_price  AS "directLowPrice"
     FROM price_snapshots
     WHERE product_id = ${productId}
     ORDER BY date ASC, sub_type_name ASC
