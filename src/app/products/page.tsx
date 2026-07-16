@@ -1,7 +1,9 @@
 import { getMovers, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
+import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
+import { safeLoad } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +21,27 @@ export default async function ProductsPage({
   const windowDays = parseWindow(sp.window);
 
   // Sealed products across ALL games. minPrice raised — sealed rarely trades low.
-  const [stats, gainers, losers] = await Promise.all([
-    getGameStats(),
-    getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
-    getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
-  ]);
+  const { data, error } = await safeLoad(async () => {
+    const [stats, gainers, losers] = await Promise.all([
+      getGameStats(),
+      getMovers({ kind: "sealed", windowDays, direction: "gainers", limit: 20, minPrice: 5 }),
+      getMovers({ kind: "sealed", windowDays, direction: "losers", limit: 20, minPrice: 5 }),
+    ]);
+    return { stats, gainers, losers };
+  });
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Sealed products <span className="text-white/50">· all games</span>
+        </h1>
+        {error && <DbErrorBanner error={error} />}
+      </div>
+    );
+  }
+
+  const { stats, gainers, losers } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2

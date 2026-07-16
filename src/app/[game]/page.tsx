@@ -4,7 +4,9 @@ import { getMovers, getMostValuable, getGameStats } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { MoversSection } from "@/components/MoversSection";
 import { CardTile } from "@/components/CardTile";
+import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { formatDate } from "@/lib/format";
+import { safeLoad } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +33,29 @@ export default async function GamePage({
   const windowDays = parseWindow(sp.window);
   const game = GAME_BY_SLUG[slug];
 
-  const [stats, gainers, losers, valuable] = await Promise.all([
-    getGameStats(slug),
-    getMovers({ game: slug, kind: "single", windowDays, direction: "gainers", limit: 20 }),
-    getMovers({ game: slug, kind: "single", windowDays, direction: "losers", limit: 20 }),
-    getMostValuable({ game: slug, kind: "single", limit: 10 }),
-  ]);
+  const { data, error } = await safeLoad(async () => {
+    const [stats, gainers, losers, valuable] = await Promise.all([
+      getGameStats(slug),
+      getMovers({ game: slug, kind: "single", windowDays, direction: "gainers", limit: 20 }),
+      getMovers({ game: slug, kind: "single", windowDays, direction: "losers", limit: 20 }),
+      getMostValuable({ game: slug, kind: "single", limit: 10 }),
+    ]);
+    return { stats, gainers, losers, valuable };
+  });
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          <span className={game.accentText}>{game.name}</span>{" "}
+          <span className="text-white/50">singles</span>
+        </h1>
+        {error && <DbErrorBanner error={error} />}
+      </div>
+    );
+  }
+
+  const { stats, gainers, losers, valuable } = data;
 
   const emptyBody =
     stats.daysOfHistory < 2

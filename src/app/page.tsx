@@ -2,12 +2,16 @@ import Link from "next/link";
 import { GAMES } from "@/lib/games";
 import { getGameStats } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
+import { safeLoad } from "@/lib/safe";
+import { DbErrorBanner } from "@/components/DbErrorBanner";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const stats = await Promise.all(
-    GAMES.map(async (g) => ({ game: g, stats: await getGameStats(g.slug) })),
+  const { data: stats, error } = await safeLoad(() =>
+    Promise.all(
+      GAMES.map(async (g) => ({ game: g, stats: await getGameStats(g.slug) })),
+    ),
   );
 
   return (
@@ -24,8 +28,10 @@ export default async function Home() {
         </p>
       </section>
 
+      {error && <DbErrorBanner error={error} />}
+
       <section className="grid gap-4 sm:grid-cols-3">
-        {stats.map(({ game, stats }) => (
+        {(stats ?? []).map(({ game, stats }) => (
           <Link
             key={game.slug}
             href={`/${game.slug}`}
