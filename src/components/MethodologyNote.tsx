@@ -89,11 +89,22 @@ export function MethodologyNote({
       </div>
 
       <details className="group mt-4">
-        <summary className="cursor-pointer list-none text-xs font-medium text-white/40 hover:text-white/70">
-          <span className="inline-block transition-transform group-open:rotate-90">
-            ▸
-          </span>{" "}
-          The exact math, and what these numbers can&apos;t tell you
+        {/* Looks like a real button: the caveats in here (TCGplayer-only prices,
+            "not advice") are the part people most need to find, so it shouldn't
+            read as fine print. */}
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-white/20 bg-white/[0.06] px-3.5 py-2 text-sm font-medium text-white/85 transition-colors hover:border-white/35 hover:bg-white/10 hover:text-white">
+          <span
+            aria-hidden
+            className="inline-block text-xs transition-transform group-open:rotate-90"
+          >
+            ▶
+          </span>
+          <span className="group-open:hidden">
+            Show the exact math &amp; what it can&apos;t tell you
+          </span>
+          <span className="hidden group-open:inline">
+            Hide the exact math
+          </span>
         </summary>
 
         <div className="mt-3 flex flex-col gap-4 text-xs leading-relaxed text-white/45">
