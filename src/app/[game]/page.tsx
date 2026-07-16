@@ -11,11 +11,13 @@ import {
   getMovers,
   getMostValuable,
   getGameStats,
+  Kind,
   MoverRow,
   ValuableRow,
 } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { KindTabs, parseKind } from "@/components/KindTabs";
 import { MoversSection } from "@/components/MoversSection";
 import { MethodologyNote } from "@/components/MethodologyNote";
 import { ValueSection } from "@/components/ValueSection";
@@ -35,26 +37,38 @@ function parseWindow(w: string | undefined): number {
   return n === 1 || n === 30 ? n : 7;
 }
 
+// Sealed rarely trades low, so its noise floor is higher than singles'.
+const MIN_PRICE: Record<Kind, number> = { single: 2, sealed: 5 };
+
 export default async function GamePage({
   params,
   searchParams,
 }: {
   params: Promise<{ game: string }>;
-  searchParams: Promise<{ view?: string; window?: string; lang?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    window?: string;
+    lang?: string;
+    kind?: string;
+  }>;
 }) {
   const { game: slug } = await params;
   if (!isGameSlug(slug)) notFound();
 
   const sp = await searchParams;
   const view = parseView(sp.view);
+  const kind = parseKind(sp.kind);
   const windowDays = parseWindow(sp.window);
   const game = GAME_BY_SLUG[slug];
   // Fall back to EN for games with no Japanese catalog on TCGplayer.
   const language: Language = hasJapanese(game) ? parseLanguage(sp.lang) : "EN";
+  const minPrice = MIN_PRICE[kind];
 
-  const q = (over: Partial<{ view: View; window: number; lang: Language }> = {}) =>
-    `/${slug}?view=${over.view ?? view}&window=${over.window ?? windowDays}&lang=${over.lang ?? language}`;
-  const href = (v: View) => q({ view: v });
+  const q = (
+    over: Partial<{ view: View; window: number; lang: Language; kind: Kind }> = {},
+  ) =>
+    `/${slug}?view=${over.view ?? view}&kind=${over.kind ?? kind}` +
+    `&window=${over.window ?? windowDays}&lang=${over.lang ?? language}`;
 
   // Only load the active tab's data — no point querying lists nobody's looking at.
   const { data, error } = await safeLoad(async () => {
@@ -63,29 +77,35 @@ export default async function GamePage({
       const movers = await getMovers({
         game: slug,
         language,
-        kind: "single",
+        kind,
         windowDays,
         direction: view === "gainers" ? "gainers" : "losers",
         limit: 20,
+        minPrice,
       });
       return { stats, movers, valuable: [] as ValuableRow[] };
     }
     const valuable = await getMostValuable({
       game: slug,
       language,
-      kind: "single",
+      kind,
       limit: view === "valuable" ? 100 : 25,
       basis: view === "valuable" ? "confirmed" : "unconfirmed",
     });
     return { stats, movers: [] as MoverRow[], valuable };
   });
 
+  const what =
+    kind === "sealed"
+      ? "sealed products"
+      : language === "JP"
+        ? "Japanese singles"
+        : "singles";
+
   const header = (
     <h1 className="text-2xl font-semibold tracking-tight">
       <span className={game.accentText}>{game.name}</span>{" "}
-      <span className="text-white/50">
-        {language === "JP" ? "Japanese singles" : "singles"}
-      </span>
+      <span className="text-white/50">{what}</span>
     </h1>
   );
 
@@ -99,11 +119,12 @@ export default async function GamePage({
   }
 
   const { stats, movers, valuable } = data;
+  const noun = kind === "sealed" ? "sealed products" : "singles";
 
   const emptyBody =
     stats.daysOfHistory < 2
       ? `We've recorded today's baseline for ${game.name}. Gainers and losers need at least two days of history to compare — they'll appear on the next daily update.`
-      : `No ${game.name} singles moved enough over this period (cards under $2 are ignored to cut noise). Try a longer period.`;
+      : `No ${game.name} ${noun} moved enough over this period (items under $${minPrice} are ignored to cut noise). Try a longer period.`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -116,14 +137,17 @@ export default async function GamePage({
         </p>
       </div>
 
-      <ViewTabs view={view} makeHref={href} />
+      <KindTabs kind={kind} makeHref={(k) => q({ kind: k })} />
+
+      <ViewTabs
+        view={view}
+        makeHref={(v) => q({ view: v })}
+        sealed={kind === "sealed"}
+      />
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         {isMoversView(view) && (
-          <WindowToggle
-            windowDays={windowDays}
-            makeHref={(d) => q({ window: d })}
-          />
+          <WindowToggle windowDays={windowDays} makeHref={(d) => q({ window: d })} />
         )}
         {hasJapanese(game) && (
           <LanguageToggle language={language} makeHref={(l) => q({ lang: l })} />
@@ -138,7 +162,7 @@ export default async function GamePage({
               ? daysBetween(movers[0].prevDate, movers[0].latestDate)
               : undefined
           }
-          minPrice={2}
+          minPrice={minPrice}
           fromDate={movers.length > 0 ? formatDate(movers[0].prevDate) : undefined}
           toDate={movers.length > 0 ? formatDate(movers[0].latestDate) : undefined}
         />
@@ -162,9 +186,10 @@ export default async function GamePage({
       )}
       {view === "valuable" && (
         <ValueSection
-          title="★ Most Valuable"
-          subtitle="Ranked by confirmed TCGplayer market price — cards that actually sell at this level."
+          title={kind === "sealed" ? "★ Most Valuable Sealed" : "★ Most Valuable"}
+          subtitle={`Ranked by confirmed TCGplayer market price — ${noun} that actually sell at this level.`}
           rows={valuable}
+          emptyBody={`No ${game.name} ${noun} with a confirmed market price yet.`}
         />
       )}
       {view === "unconfirmed" && (
@@ -173,6 +198,7 @@ export default async function GamePage({
           subtitle="Nobody has bought one of these on TCGplayer, so there's no market price. These are seller asking prices, which can be pure fantasy — kept separate so they don't distort the ranking."
           rows={valuable}
           tone="warning"
+          emptyBody={`Every tracked ${game.name} ${noun} has a confirmed market price — nothing unconfirmed here.`}
         />
       )}
     </div>

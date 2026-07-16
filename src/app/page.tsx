@@ -52,27 +52,11 @@ export default async function Home() {
                 : "No data yet"}
             </p>
             <span className="mt-2 text-sm font-medium text-white/60 group-hover:text-white">
-              View movers →
+              Singles &amp; sealed →
             </span>
           </Link>
         ))}
       </section>
-
-      <Link
-        href="/products"
-        className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-white/20 hover:bg-white/[0.06]"
-      >
-        <div className="flex flex-col gap-1">
-          <span className="text-lg font-semibold">📦 Sealed products — all games</span>
-          <span className="text-sm text-white/40">
-            Biggest movers on booster boxes, packs, and decks across Pokémon, One
-            Piece, and Riftbound combined.
-          </span>
-        </div>
-        <span className="shrink-0 text-sm font-medium text-white/60 group-hover:text-white">
-          View →
-        </span>
-      </Link>
 
       <section className="grid gap-6 rounded-2xl border border-white/10 bg-white/[0.02] p-8 sm:grid-cols-3">
         <Step
