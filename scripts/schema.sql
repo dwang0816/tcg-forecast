@@ -1,0 +1,84 @@
+-- Full schema for a fresh database. Idempotent — safe to re-run.
+--
+--   npm run schema        (applies this to DATABASE_URL)
+--
+-- Why this exists rather than drizzle/*.sql: the live schema was evolved with
+-- `drizzle-kit push` plus hand-applied DDL, so the generated migrations drifted
+-- badly out of date — they know nothing about `language`, `extended`, the
+-- stamped price columns, `search_text`, or the trigram indexes. This file is the
+-- authoritative definition and is what stands a new database up.
+--
+-- Two things here are deliberately NOT in src/db/schema.ts, because Drizzle
+-- can't express them:
+--   * search_text — a GENERATED STORED column concatenating every field we
+--     search. It's what makes "cleffa obsidian" find a card whose name holds one
+--     word and whose set holds the other.
+--   * the gin_trgm_ops indexes that make ILIKE/similarity on it fast.
+-- Keep this file in sync by hand when schema.ts changes.
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE TABLE IF NOT EXISTS cards (
+  product_id     integer PRIMARY KEY NOT NULL,
+  game           text NOT NULL,
+  language       text NOT NULL DEFAULT 'EN',
+  category_id    integer NOT NULL,
+  group_id       integer NOT NULL,
+  group_name     text NOT NULL,
+  name           text NOT NULL,
+  clean_name     text,
+  image_url      text,
+  alt_image_urls text[],
+  url            text,
+  rarity         text,
+  number         text,
+  extended       jsonb,
+  is_single      boolean NOT NULL DEFAULT false,
+  tracked        boolean NOT NULL DEFAULT true,
+  -- Current prices stamped onto every card by ingest, so the ~64k priced cards
+  -- are all browsable without touching the multi-million-row history table.
+  market_price   double precision,
+  listing_price  double precision,
+  low_price      double precision,
+  high_price     double precision,
+  price_date     date,
+  updated_at     timestamp NOT NULL DEFAULT now()
+);
+
+-- Everything we search, lowercased into one blob. Token-AND against this is what
+-- lets keywords come from different fields.
+ALTER TABLE cards DROP COLUMN IF EXISTS search_text;
+ALTER TABLE cards ADD COLUMN search_text text
+  GENERATED ALWAYS AS (
+    lower(
+      COALESCE(name, '')       || ' ' ||
+      COALESCE(clean_name, '') || ' ' ||
+      COALESCE(group_name, '') || ' ' ||
+      COALESCE(rarity, '')     || ' ' ||
+      COALESCE(number, '')     || ' ' ||
+      COALESCE(game, '')       || ' ' ||
+      COALESCE(language, '')
+    )
+  ) STORED;
+
+CREATE TABLE IF NOT EXISTS price_snapshots (
+  product_id       integer NOT NULL REFERENCES cards(product_id) ON DELETE CASCADE,
+  sub_type_name    text NOT NULL,
+  date             date NOT NULL,
+  market_price     double precision,
+  low_price        double precision,
+  mid_price        double precision,
+  high_price       double precision,
+  direct_low_price double precision,
+  CONSTRAINT price_snapshots_product_id_sub_type_name_date_pk
+    PRIMARY KEY (product_id, sub_type_name, date)
+);
+
+CREATE INDEX IF NOT EXISTS cards_game_idx        ON cards USING btree (game);
+CREATE INDEX IF NOT EXISTS cards_game_single_idx ON cards USING btree (game, is_single);
+CREATE INDEX IF NOT EXISTS cards_game_lang_idx   ON cards USING btree (game, language, is_single);
+CREATE INDEX IF NOT EXISTS cards_tracked_idx     ON cards USING btree (tracked);
+CREATE INDEX IF NOT EXISTS cards_number_idx      ON cards USING btree (upper(number));
+CREATE INDEX IF NOT EXISTS cards_name_trgm       ON cards USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS cards_search_trgm     ON cards USING gin (search_text gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS snap_date_idx         ON price_snapshots USING btree (date);

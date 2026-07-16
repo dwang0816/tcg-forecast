@@ -12,12 +12,15 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "ingest": "tsx scripts/ingest.ts",
-    "backfill": "tsx scripts/backfill.ts"
+    "backfill": "tsx scripts/backfill.ts",
+    "schema": "tsx scripts/schema.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@types/pg": "^8.20.0",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.10",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
