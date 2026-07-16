@@ -37,8 +37,14 @@ const RANGES: { label: string; days: number | null }[] = [
 ];
 
 // Validated against our dark surface (#12121a) with the dataviz validator:
-// lightness band, chroma floor, CVD separation (ΔE 15.7 worst) and contrast all pass.
+// lightness band, chroma floor, CVD separation and contrast all pass, worst
+// adjacent ΔE 41.3 (protan) across the three together.
 const SERIES_COLORS = ["#3987e5", "#199e70"];
+
+// Asking is its own measure, not a shade of paid, so it gets its own hue rather
+// than a tint of the line. Amber is the CVD-safe partner to blue, and it's the
+// one categorical slot that can't be mistaken for a second printing's aqua.
+const BAND_COLOR = "#c98500";
 
 // right leaves room for the endpoint price label, which sits outside the plot.
 const PAD = { top: 20, right: 84, bottom: 28, left: 56 };
@@ -145,6 +151,22 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
   const primary = series[0];
   const hasBand = primary.points.some((p) => p.low != null && p.high != null);
 
+  // The primary's area wash. Rendered before the band rather than with its line:
+  // it's decoration, and a 0.30 blue laid over the band would mute the amber in
+  // exactly the region the band exists to show.
+  const areaPts = primary.points.filter((p) => p.market != null);
+  const primaryArea =
+    areaPts.length > 1
+      ? areaPts
+          .map(
+            (p, i) =>
+              `${i === 0 ? "M" : "L"}${xFor(idxOf(p.date))},${yFor(p.market!)}`,
+          )
+          .join(" ") +
+        ` L${xFor(idxOf(areaPts.at(-1)!.date))},${yFor(yMin)}` +
+        ` L${xFor(idxOf(areaPts[0].date))},${yFor(yMin)} Z`
+      : "";
+
   // Band: out along the highs, back along the lows.
   const bandPts = primary.points.filter((p) => p.low != null && p.high != null);
   const bandPath =
@@ -227,8 +249,11 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           <span className="flex items-start gap-2 text-white/60">
             <span
               aria-hidden
-              className="mt-1 h-2.5 w-4 shrink-0 rounded-sm"
-              style={{ background: SERIES_COLORS[0], opacity: 0.22 }}
+              className="mt-1 h-2.5 w-4 shrink-0 rounded-sm border"
+              style={{
+                background: `${BAND_COLOR}42`,
+                borderColor: `${BAND_COLOR}a6`,
+              }}
             />
             <span>
               <strong className="font-semibold text-white/80">The shaded band</strong>{" "}
@@ -335,15 +360,23 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
             {formatDate(dates[dates.length - 1])}
           </text>
 
-          {/* asking range, behind everything */}
+          {primaryArea && (
+            <path
+              className={`fade-${uid}`}
+              d={primaryArea}
+              fill={`url(#area-${uid}-0)`}
+            />
+          )}
+
+          {/* asking range — behind the lines, above the wash */}
           {bandPath && (
             <path
               className={`fade-${uid}`}
               d={bandPath}
-              fill={SERIES_COLORS[0]}
-              fillOpacity="0.14"
-              stroke={SERIES_COLORS[0]}
-              strokeOpacity="0.22"
+              fill={BAND_COLOR}
+              fillOpacity="0.26"
+              stroke={BAND_COLOR}
+              strokeOpacity="0.65"
               strokeWidth="1"
             />
           )}
@@ -370,18 +403,12 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                   `${i === 0 ? "M" : "L"}${xFor(idxOf(p.date))},${yFor(p.market!)}`,
               )
               .join(" ");
-            const area =
-              `${line} L${xFor(idxOf(pts.at(-1)!.date))},${yFor(yMin)}` +
-              ` L${xFor(idxOf(pts[0].date))},${yFor(yMin)} Z`;
             const last = pts.at(-1)!;
             const hovered = hoverDate
               ? pts.find((p) => p.date === hoverDate)
               : undefined;
             return (
               <g key={s.label}>
-                {si === 0 && (
-                  <path className={`fade-${uid}`} d={area} fill={`url(#area-${uid}-${si})`} />
-                )}
                 <path
                   className={`draw-${uid}`}
                   pathLength={1}

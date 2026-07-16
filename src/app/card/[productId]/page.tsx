@@ -2,13 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCard, getCardHistory } from "@/lib/queries";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
-import { cardImageSources } from "@/lib/images";
+import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { PriceChart } from "@/components/PriceChart";
 import { CardPriceHeadline, CardPriceFacts } from "@/components/CardPriceStats";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { statsByPrinting } from "@/lib/cardStats";
-import { formatDate } from "@/lib/format";
+import { formatDate, money } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,14 @@ export default async function CardPage({
     number: card.number,
     imageUrl: card.imageUrl,
     altImageUrls: card.altImageUrls,
+    ebayPhotoUrl: card.ebayPhotoUrl,
   });
+  // TCGplayer never photographed some cards — whole old Japanese sets. For those
+  // the picture is a seller's photo of their own copy, so it gets named as one
+  // and linked to the listing. Unlabelled it would read as the card's artwork,
+  // and it isn't: it may be sleeved, angled, or (for two-part LEGEND cards) show
+  // both halves on someone's table.
+  const listingPhoto = !hasOfficialArt(card) && Boolean(card.ebayPhotoUrl);
 
   // Keep every day, including ones with no sale: a gap in the market price IS
   // the signal on a thin card, and the asking band still has something to say.
@@ -85,14 +92,34 @@ export default async function CardPage({
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,300px)_1fr]">
         {/* Image */}
-        <div className="relative aspect-[5/7] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-          <CardImage sources={sources} alt={card.name} />
-          {game && (
-            <span
-              className={`absolute bottom-3 left-3 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white ${game.accent}`}
-            >
-              {game.name}
-            </span>
+        <div className="flex flex-col gap-2">
+          <div className="relative aspect-[5/7] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+            <CardImage sources={sources} alt={card.name} />
+            {game && (
+              <span
+                className={`absolute bottom-3 left-3 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white ${game.accent}`}
+              >
+                {game.name}
+              </span>
+            )}
+          </div>
+          {listingPhoto && (
+            <p className="text-[11px] leading-snug text-white/40">
+              No official picture exists for this card, so this is a photo from a
+              live eBay listing
+              {card.ebayListingPrice != null ? ` (${money(card.ebayListingPrice)})` : ""}
+              , taken by the seller.{" "}
+              {card.ebayListingUrl && (
+                <a
+                  href={card.ebayListingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="text-white/60 underline underline-offset-2 hover:text-white/90"
+                >
+                  See the listing ↗
+                </a>
+              )}
+            </p>
           )}
         </div>
 

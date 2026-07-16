@@ -13,12 +13,28 @@ function hiRes(url: string): string {
   );
 }
 
+/**
+ * Does this card have real card art, as opposed to a seller's photo?
+ *
+ * Callers use this to decide whether to caption the image. If it's false and an
+ * eBay photo exists, that photo is what the reader will see, and it must be
+ * labelled as someone's listing rather than passed off as the card's artwork.
+ */
+export function hasOfficialArt(opts: {
+  imageUrl: string | null;
+  altImageUrls?: string[] | null;
+}): boolean {
+  return Boolean(opts.imageUrl) || (opts.altImageUrls?.length ?? 0) > 0;
+}
+
 export function cardImageSources(opts: {
   game?: string | null;
   number: string | null;
   imageUrl: string | null;
   /** Images from sibling printings that share this card's number. */
   altImageUrls?: string[] | null;
+  /** A photo from a live eBay listing — last resort, and always attributed. */
+  ebayPhotoUrl?: string | null;
 }): string[] {
   const sources: string[] = [];
   const push = (u: string | null | undefined) => {
@@ -46,6 +62,14 @@ export function cardImageSources(opts: {
       push(`https://optcgapi.com/media/static/Card_Images/${code}.jpg`);
     }
   }
+
+  // Last: a photo from a live eBay listing. Only reached when nothing above
+  // exists, i.e. TCGplayer never photographed this card — whole old Japanese
+  // sets. It's a seller's photograph of their own copy: sometimes a clean scan,
+  // sometimes sleeved and angled, and for two-part LEGEND cards a picture of both
+  // halves on a table. So callers pair it with hasOfficialArt() and caption it.
+  // Never reordered above the real art.
+  push(opts.ebayPhotoUrl);
 
   return sources;
 }

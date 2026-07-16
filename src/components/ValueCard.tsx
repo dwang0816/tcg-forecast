@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { money } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
-import { cardImageSources } from "@/lib/images";
+import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
@@ -19,7 +19,11 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
     number: row.number,
     imageUrl: row.imageUrl,
     altImageUrls: row.altImageUrls,
+    ebayPhotoUrl: row.ebayPhotoUrl,
   });
+  // No real art means the picture below is a seller's photo of their own copy.
+  // Say so on the tile — unlabelled, it reads as the card's artwork.
+  const listingPhoto = !hasOfficialArt(row) && Boolean(row.ebayPhotoUrl);
 
   return (
     <Link
@@ -43,6 +47,14 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
             className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
           >
             {game.name}
+          </span>
+        )}
+        {listingPhoto && (
+          <span
+            className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white/70 backdrop-blur"
+            title="No official art exists for this card — this is a photo from a live eBay listing."
+          >
+            listing photo
           </span>
         )}
       </div>

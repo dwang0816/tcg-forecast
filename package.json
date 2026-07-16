@@ -12,7 +12,8 @@
     "db:studio": "drizzle-kit studio",
     "ingest": "tsx scripts/ingest.ts",
     "backfill": "tsx scripts/backfill.ts",
-    "schema": "tsx scripts/schema.ts"
+    "schema": "tsx scripts/schema.ts",
+    "photos": "tsx scripts/photos.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

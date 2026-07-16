@@ -45,6 +45,7 @@ export function MoversSection({
               groupName={row.groupName}
               imageUrl={row.imageUrl}
               altImageUrls={row.altImageUrls}
+              ebayPhotoUrl={row.ebayPhotoUrl}
               subTypeName={row.subTypeName}
               rarity={row.rarity}
               number={row.number}

@@ -45,6 +45,24 @@ CREATE TABLE IF NOT EXISTS cards (
   updated_at     timestamp NOT NULL DEFAULT now()
 );
 
+-- A photo of the card from a live eBay listing, for the ~3% of tracked cards
+-- TCGplayer has no art for (whole old Japanese sets it never photographed).
+--
+-- The URL only — the photograph belongs to the seller, so it's displayed as
+-- their listing, captioned and linked, never copied to our storage. See
+-- lib/ebay.ts.
+--
+-- Deliberately separate from image_url: ingest upserts every card daily and
+-- would flatten these. Nothing in ingest touches an ebay_* column, so a photo
+-- found once survives until the photo job replaces it.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_photo_url     text;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_listing_url   text;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_listing_title text;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_listing_price double precision;
+-- When we last asked eBay. Also marks "asked and found nothing", so a rerun can
+-- skip cards it already failed on rather than burning the API quota again.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_photo_at      timestamp;
+
 -- Everything we search, lowercased into one blob. Token-AND against this is what
 -- lets keywords come from different fields.
 ALTER TABLE cards DROP COLUMN IF EXISTS search_text;

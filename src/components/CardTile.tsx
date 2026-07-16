@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { money, percent, signedMoney } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
-import { cardImageSources } from "@/lib/images";
+import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
@@ -13,6 +13,7 @@ export interface CardTileProps {
   groupName: string;
   imageUrl: string | null;
   altImageUrls?: string[] | null;
+  ebayPhotoUrl?: string | null;
   subTypeName: string;
   rarity: string | null;
   number: string | null;
@@ -36,6 +37,7 @@ export function CardTile({
   groupName,
   imageUrl,
   altImageUrls,
+  ebayPhotoUrl,
   subTypeName,
   rarity,
   number,
@@ -49,7 +51,9 @@ export function CardTile({
 }: CardTileProps) {
   const up = change ? change.pct >= 0 : false;
   const game = gameSlug && isGameSlug(gameSlug) ? GAME_BY_SLUG[gameSlug] : null;
-  const sources = cardImageSources({ game: gameSlug, number, imageUrl, altImageUrls });
+  const sources = cardImageSources({ game: gameSlug, number, imageUrl, altImageUrls, ebayPhotoUrl });
+  // See ValueCard: an unlabelled seller photo reads as the card's artwork.
+  const listingPhoto = !hasOfficialArt({ imageUrl, altImageUrls }) && Boolean(ebayPhotoUrl);
 
   return (
     <Link
@@ -74,6 +78,14 @@ export function CardTile({
             className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
           >
             {game.name}
+          </span>
+        )}
+        {listingPhoto && (
+          <span
+            className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white/70 backdrop-blur"
+            title="No official art exists for this card — this is a photo from a live eBay listing."
+          >
+            listing photo
           </span>
         )}
       </div>

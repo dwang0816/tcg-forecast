@@ -12,6 +12,8 @@ export interface MoverRow {
   groupName: string;
   imageUrl: string | null;
   altImageUrls: string[] | null;
+  /** Photo from a live eBay listing — only for cards with no real art. */
+  ebayPhotoUrl: string | null;
   url: string | null;
   rarity: string | null;
   number: string | null;
@@ -34,6 +36,8 @@ export interface ValuableRow {
   groupName: string;
   imageUrl: string | null;
   altImageUrls: string[] | null;
+  /** Photo from a live eBay listing — only for cards with no real art. */
+  ebayPhotoUrl: string | null;
   url: string | null;
   rarity: string | null;
   number: string | null;
@@ -154,6 +158,7 @@ export async function getMovers({
       c.group_name      AS "groupName",
       c.image_url       AS "imageUrl",
       c.alt_image_urls  AS "altImageUrls",
+      c.ebay_photo_url  AS "ebayPhotoUrl",
       c.url             AS "url",
       c.rarity          AS "rarity",
       c.number          AS "number",
@@ -240,6 +245,7 @@ export async function getMostValuable({
       group_name    AS "groupName",
       image_url      AS "imageUrl",
       alt_image_urls AS "altImageUrls",
+      ebay_photo_url AS "ebayPhotoUrl",
       url            AS "url",
       rarity        AS "rarity",
       number        AS "number",
@@ -355,6 +361,14 @@ export interface CardDetail {
   number: string | null;
   imageUrl: string | null;
   altImageUrls: string[] | null;
+  /**
+   * A seller's photo from a live eBay listing, for cards TCGplayer has no art
+   * for. Shown only when there's no real art, and always captioned + linked —
+   * the photograph is the seller's, and it looks like one.
+   */
+  ebayPhotoUrl: string | null;
+  ebayListingUrl: string | null;
+  ebayListingPrice: number | null;
   url: string | null;
   isSingle: boolean;
   extended: { name: string; displayName: string; value: string }[] | null;
@@ -384,6 +398,9 @@ export async function getCard(productId: number): Promise<CardDetail | null> {
       number         AS "number",
       image_url      AS "imageUrl",
       alt_image_urls AS "altImageUrls",
+      ebay_photo_url     AS "ebayPhotoUrl",
+      ebay_listing_url   AS "ebayListingUrl",
+      ebay_listing_price AS "ebayListingPrice",
       url            AS "url",
       is_single      AS "isSingle",
       extended       AS "extended"
@@ -471,6 +488,7 @@ export async function searchCards({
     c.group_name      AS "groupName",
     c.image_url       AS "imageUrl",
     c.alt_image_urls  AS "altImageUrls",
+    c.ebay_photo_url  AS "ebayPhotoUrl",
     c.url             AS "url",
     c.rarity          AS "rarity",
     c.number          AS "number",
