@@ -1,6 +1,6 @@
 import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
-import { GameSlug } from "./games";
+import { GameSlug, Language } from "./games";
 
 export type Direction = "gainers" | "losers";
 export type Kind = "single" | "sealed";
@@ -77,6 +77,7 @@ const SQL_CONFIDENCE = sql`
  */
 export async function getMovers({
   game,
+  language,
   kind,
   windowDays,
   direction,
@@ -84,6 +85,7 @@ export async function getMovers({
   minPrice = 2,
 }: {
   game?: GameSlug;
+  language?: Language;
   kind: Kind;
   windowDays: number;
   direction: Direction;
@@ -93,6 +95,7 @@ export async function getMovers({
   const db = getDb();
   const order = sql.raw(direction === "gainers" ? "DESC" : "ASC");
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
+  const langFilter = language ? sql`AND c.language = ${language}` : sql``;
   const isSingle = kind === "single";
 
   const res = await db.execute(sql`
@@ -143,7 +146,7 @@ export async function getMovers({
       AND cur.market_price <> prev.market_price
       AND prev.date < (SELECT latest FROM bounds)
       AND c.is_single = ${isSingle}
-      ${gameFilter}
+      ${gameFilter} ${langFilter}
     ORDER BY
       ((cur.market_price - prev.market_price) / prev.market_price) * ${SQL_CONFIDENCE} ${order}
     LIMIT ${limit}
@@ -164,17 +167,20 @@ export async function getMovers({
  */
 export async function getMostValuable({
   game,
+  language,
   kind = "single",
   limit = 100,
   basis = "confirmed",
 }: {
   game?: GameSlug;
+  language?: Language;
   kind?: Kind;
   limit?: number;
   basis?: "confirmed" | "unconfirmed";
 }): Promise<ValuableRow[]> {
   const db = getDb();
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
+  const langFilter = language ? sql`AND c.language = ${language}` : sql``;
   const isSingle = kind === "single";
   const basisFilter =
     basis === "confirmed"
@@ -198,7 +204,7 @@ export async function getMostValuable({
       FROM price_snapshots ps
       JOIN latest ON ps.date = latest.d
       JOIN cards c ON c.product_id = ps.product_id
-      WHERE c.is_single = ${isSingle} ${gameFilter}
+      WHERE c.is_single = ${isSingle} ${gameFilter} ${langFilter}
     )
     SELECT
       game          AS "game",
@@ -232,9 +238,17 @@ export interface GameStats {
 }
 
 /** Coverage summary used to drive empty states and "data through" labels. */
-export async function getGameStats(game?: GameSlug): Promise<GameStats> {
+export async function getGameStats(
+  game?: GameSlug,
+  language?: Language,
+): Promise<GameStats> {
   const db = getDb();
-  const gameFilter = game ? sql`WHERE c.game = ${game}` : sql``;
+  const conds = [];
+  if (game) conds.push(sql`c.game = ${game}`);
+  if (language) conds.push(sql`c.language = ${language}`);
+  let gameFilter = sql``;
+  if (conds.length === 1) gameFilter = sql`WHERE ${conds[0]}`;
+  if (conds.length === 2) gameFilter = sql`WHERE ${conds[0]} AND ${conds[1]}`;
   const res = await db.execute(sql`
     SELECT
       max(ps.date) AS "latestDate",

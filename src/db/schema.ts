@@ -17,6 +17,9 @@ export const cards = pgTable(
   {
     productId: integer("product_id").primaryKey(),
     game: text("game").notNull(), // GameSlug: pokemon | onepiece | riftbound
+    // "EN" | "JP". Derived from which TCGplayer category the product came from
+    // (Pokemon=3 vs Pokemon Japan=85). Only Pokémon has both.
+    language: text("language").notNull().default("EN"),
     categoryId: integer("category_id").notNull(),
     groupId: integer("group_id").notNull(),
     groupName: text("group_name").notNull(), // the set / expansion name
@@ -39,6 +42,7 @@ export const cards = pgTable(
   (t) => [
     index("cards_game_idx").on(t.game),
     index("cards_game_single_idx").on(t.game, t.isSingle),
+    index("cards_game_lang_idx").on(t.game, t.language, t.isSingle),
     index("cards_tracked_idx").on(t.tracked),
   ],
 );

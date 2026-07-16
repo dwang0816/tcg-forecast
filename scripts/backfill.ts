@@ -48,13 +48,18 @@ function dateNDaysAgo(daysAgo: number): string {
 
 async function main() {
   const days = Number(process.argv[2] ?? 30);
+  // `force` re-processes days we already have. Needed when a new category is
+  // added (e.g. Pokemon Japan) — those dates are "stored" from the earlier pass
+  // but are missing the new category's rows. Inserts are onConflictDoNothing,
+  // so re-running never disturbs existing snapshots.
+  const force = process.argv[3] === "force";
   if (!existsSync(SEVEN_ZIP)) {
     throw new Error(`7-Zip not found at ${SEVEN_ZIP}. Set SEVEN_ZIP env var.`);
   }
 
   const { getDb } = await import("../src/db");
   const { priceSnapshots } = await import("../src/db/schema");
-  const { GAMES } = await import("../src/lib/games");
+  const { allCategoryIds } = await import("../src/lib/games");
   const { sql } = await import("drizzle-orm");
   const db = getDb();
   const rowsOf = <T,>(r: unknown) => ((r as { rows?: T[] }).rows ?? []);
@@ -69,13 +74,13 @@ async function main() {
 
   console.log(`tracked cards: ${tracked.size} | dates already stored: ${have.size}`);
 
-  const cats = GAMES.map((g) => g.categoryId);
+  const cats = allCategoryIds(); // every game+language category (incl. Pokemon Japan)
   let totalInserted = 0;
 
   // Walk backwards from yesterday (today's archive won't exist until ~20:00 UTC).
   for (let i = 1; i <= days; i++) {
     const date = dateNDaysAgo(i);
-    if (have.has(date)) {
+    if (!force && have.has(date)) {
       console.log(`${date}  skip (already stored)`);
       continue;
     }

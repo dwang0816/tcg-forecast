@@ -33,15 +33,18 @@ jobs:
           SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
-          for game in pokemon onepiece riftbound; do
-            echo "::group::Ingesting $game"
+          # game:language pairs. Only Pokémon has a Japanese catalog on TCGplayer
+          # (category 85); One Piece and Riftbound are English-only there.
+          for target in "pokemon:EN" "pokemon:JP" "onepiece:EN" "riftbound:EN"; do
+            game="${target%%:*}"; lang="${target##*:}"
+            echo "::group::Ingesting $game ($lang)"
             code=$(curl -sS --max-time 300 -o /tmp/out.json -w "%{http_code}" \
               -H "Authorization: Bearer $SECRET" \
-              "$BASE/api/ingest?game=$game")
+              "$BASE/api/ingest?game=$game&language=$lang")
             cat /tmp/out.json; echo
             echo "::endgroup::"
             if [ "$code" != "200" ]; then
-              echo "Ingest for $game failed with HTTP $code"
+              echo "Ingest for $game ($lang) failed with HTTP $code"
               exit 1
             fi
           done

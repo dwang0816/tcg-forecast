@@ -6,6 +6,8 @@ import {
   ValuableRow,
 } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { parseLanguage, Language } from "@/lib/games";
 import { MoversSection } from "@/components/MoversSection";
 import { ValueSection } from "@/components/ValueSection";
 import { ViewTabs, View, parseView, isMoversView } from "@/components/ViewTabs";
@@ -23,19 +25,23 @@ function parseWindow(w: string | undefined): number {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; window?: string }>;
+  searchParams: Promise<{ view?: string; window?: string; lang?: string }>;
 }) {
   const sp = await searchParams;
   const view = parseView(sp.view);
   const windowDays = parseWindow(sp.window);
+  const language: Language = parseLanguage(sp.lang);
 
-  const href = (v: View) => `/products?view=${v}&window=${windowDays}`;
+  const q = (over: Partial<{ view: View; window: number; lang: Language }> = {}) =>
+    `/products?view=${over.view ?? view}&window=${over.window ?? windowDays}&lang=${over.lang ?? language}`;
+  const href = (v: View) => q({ view: v });
 
   // Sealed products across ALL games. minPrice raised — sealed rarely trades low.
   const { data, error } = await safeLoad(async () => {
-    const stats = await getGameStats();
+    const stats = await getGameStats(undefined, language);
     if (isMoversView(view)) {
       const movers = await getMovers({
+        language,
         kind: "sealed",
         windowDays,
         direction: view === "gainers" ? "gainers" : "losers",
@@ -45,6 +51,7 @@ export default async function ProductsPage({
       return { stats, movers, valuable: [] as ValuableRow[] };
     }
     const valuable = await getMostValuable({
+      language,
       kind: "sealed",
       limit: view === "valuable" ? 100 : 25,
       basis: view === "valuable" ? "confirmed" : "unconfirmed",
@@ -79,19 +86,19 @@ export default async function ProductsPage({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         {header}
         <p className="text-xs text-white/40">
-          Pokémon · One Piece · Riftbound · data through{" "}
+          {language === "JP" ? "Pokémon Japan" : "Pokémon · One Piece · Riftbound"} · data through{" "}
           {formatDate(stats.latestDate)}
         </p>
       </div>
 
       <ViewTabs view={view} makeHref={href} sealed />
 
-      {isMoversView(view) && (
-        <WindowToggle
-          windowDays={windowDays}
-          makeHref={(d) => `/products?view=${view}&window=${d}`}
-        />
-      )}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {isMoversView(view) && (
+          <WindowToggle windowDays={windowDays} makeHref={(d) => q({ window: d })} />
+        )}
+        <LanguageToggle language={language} makeHref={(l) => q({ lang: l })} />
+      </div>
 
       {view === "gainers" && (
         <MoversSection

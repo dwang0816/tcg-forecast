@@ -1,5 +1,12 @@
 import { notFound } from "next/navigation";
-import { GAMES, GAME_BY_SLUG, isGameSlug } from "@/lib/games";
+import {
+  GAMES,
+  GAME_BY_SLUG,
+  isGameSlug,
+  parseLanguage,
+  hasJapanese,
+  Language,
+} from "@/lib/games";
 import {
   getMovers,
   getMostValuable,
@@ -8,6 +15,7 @@ import {
   ValuableRow,
 } from "@/lib/queries";
 import { WindowToggle } from "@/components/WindowToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { MoversSection } from "@/components/MoversSection";
 import { ValueSection } from "@/components/ValueSection";
 import { ViewTabs, View, parseView, isMoversView } from "@/components/ViewTabs";
@@ -31,7 +39,7 @@ export default async function GamePage({
   searchParams,
 }: {
   params: Promise<{ game: string }>;
-  searchParams: Promise<{ view?: string; window?: string }>;
+  searchParams: Promise<{ view?: string; window?: string; lang?: string }>;
 }) {
   const { game: slug } = await params;
   if (!isGameSlug(slug)) notFound();
@@ -40,15 +48,20 @@ export default async function GamePage({
   const view = parseView(sp.view);
   const windowDays = parseWindow(sp.window);
   const game = GAME_BY_SLUG[slug];
+  // Fall back to EN for games with no Japanese catalog on TCGplayer.
+  const language: Language = hasJapanese(game) ? parseLanguage(sp.lang) : "EN";
 
-  const href = (v: View) => `/${slug}?view=${v}&window=${windowDays}`;
+  const q = (over: Partial<{ view: View; window: number; lang: Language }> = {}) =>
+    `/${slug}?view=${over.view ?? view}&window=${over.window ?? windowDays}&lang=${over.lang ?? language}`;
+  const href = (v: View) => q({ view: v });
 
   // Only load the active tab's data — no point querying lists nobody's looking at.
   const { data, error } = await safeLoad(async () => {
-    const stats = await getGameStats(slug);
+    const stats = await getGameStats(slug, language);
     if (isMoversView(view)) {
       const movers = await getMovers({
         game: slug,
+        language,
         kind: "single",
         windowDays,
         direction: view === "gainers" ? "gainers" : "losers",
@@ -58,6 +71,7 @@ export default async function GamePage({
     }
     const valuable = await getMostValuable({
       game: slug,
+      language,
       kind: "single",
       limit: view === "valuable" ? 100 : 25,
       basis: view === "valuable" ? "confirmed" : "unconfirmed",
@@ -68,7 +82,9 @@ export default async function GamePage({
   const header = (
     <h1 className="text-2xl font-semibold tracking-tight">
       <span className={game.accentText}>{game.name}</span>{" "}
-      <span className="text-white/50">singles</span>
+      <span className="text-white/50">
+        {language === "JP" ? "Japanese singles" : "singles"}
+      </span>
     </h1>
   );
 
@@ -101,12 +117,17 @@ export default async function GamePage({
 
       <ViewTabs view={view} makeHref={href} />
 
-      {isMoversView(view) && (
-        <WindowToggle
-          windowDays={windowDays}
-          makeHref={(d) => `/${slug}?view=${view}&window=${d}`}
-        />
-      )}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {isMoversView(view) && (
+          <WindowToggle
+            windowDays={windowDays}
+            makeHref={(d) => q({ window: d })}
+          />
+        )}
+        {hasJapanese(game) && (
+          <LanguageToggle language={language} makeHref={(l) => q({ lang: l })} />
+        )}
+      </div>
 
       {view === "gainers" && (
         <MoversSection

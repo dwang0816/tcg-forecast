@@ -1,7 +1,7 @@
 import { getDb } from "@/db";
 import { cards, priceSnapshots, type NewCard, type NewPriceSnapshot } from "@/db/schema";
 import { sql } from "drizzle-orm";
-import { Game } from "./games";
+import { Game, Language, categoryFor } from "./games";
 import {
   getGroups,
   getProducts,
@@ -14,6 +14,7 @@ import { isTracked, sanePrice } from "./tracking";
 
 export interface IngestResult {
   game: string;
+  language: Language;
   date: string;
   groups: number;
   cards: number;
@@ -52,15 +53,23 @@ export function classifyIsSingle(
  * `date`. Safe to re-run: cards are upserted, snapshots are inserted once per
  * (product, subtype, date).
  */
-export async function ingestGame(game: Game, date?: string): Promise<IngestResult> {
+export async function ingestGame(
+  game: Game,
+  language: Language = "EN",
+  date?: string,
+): Promise<IngestResult> {
   const db = getDb();
+  const categoryId = categoryFor(game, language);
+  if (categoryId == null) {
+    throw new Error(`${game.slug} has no ${language} catalog on TCGplayer`);
+  }
   // Date the snapshot by when tcgcsv published the data, NOT by when we ran.
   // We ingest 6x/day but tcgcsv refreshes once (~20:00 UTC), so runs before the
   // refresh return the previous day's prices — stamping those with today's date
   // would create a duplicate phantom day and break movers. Fall back to our own
   // UTC date only if tcgcsv doesn't tell us.
   const snapshotDate = date ?? (await getLastUpdated()) ?? utcDate();
-  const groups = await getGroups(game.categoryId);
+  const groups = await getGroups(categoryId);
 
   const cardRows: NewCard[] = [];
   const snapRows: NewPriceSnapshot[] = [];
@@ -69,8 +78,8 @@ export async function ingestGame(game: Game, date?: string): Promise<IngestResul
 
   await mapPool(groups, 4, async (group) => {
     const [products, prices] = await Promise.all([
-      getProducts(game.categoryId, group.groupId),
-      getPrices(game.categoryId, group.groupId),
+      getProducts(categoryId, group.groupId),
+      getPrices(categoryId, group.groupId),
     ]);
 
     for (const p of products) {
@@ -79,7 +88,8 @@ export async function ingestGame(game: Game, date?: string): Promise<IngestResul
       cardRows.push({
         productId: p.productId,
         game: game.slug,
-        categoryId: game.categoryId,
+        categoryId,
+        language,
         groupId: group.groupId,
         groupName: group.name,
         name: p.name,
@@ -172,6 +182,8 @@ export async function ingestGame(game: Game, date?: string): Promise<IngestResul
       .onConflictDoUpdate({
         target: cards.productId,
         set: {
+          language: sql`excluded.language`,
+          categoryId: sql`excluded.category_id`,
           groupName: sql`excluded.group_name`,
           name: sql`excluded.name`,
           cleanName: sql`excluded.clean_name`,
@@ -215,6 +227,7 @@ export async function ingestGame(game: Game, date?: string): Promise<IngestResul
 
   return {
     game: game.slug,
+    language,
     date: snapshotDate,
     groups: groups.length,
     cards: cardRows.length,
