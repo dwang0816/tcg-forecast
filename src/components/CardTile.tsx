@@ -14,6 +14,8 @@ export interface CardTileProps {
   number: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
+  /** "listing" marks an asking-price fallback (no confirmed TCGplayer market). */
+  priceType?: "market" | "listing";
   /** Game slug — used to source fallback images and (with showBadge) the label. */
   gameSlug?: string;
   /** Show the game badge (cross-game views only). */
@@ -31,6 +33,7 @@ export function CardTile({
   number,
   price,
   change,
+  priceType = "market",
   gameSlug,
   showBadge = false,
 }: CardTileProps) {
@@ -77,8 +80,18 @@ export function CardTile({
         </div>
 
         <div className="mt-auto flex items-end justify-between pt-2">
-          <span className="text-base font-semibold tabular-nums text-white">
-            {money(price)}
+          <span className="flex flex-col">
+            <span className="text-base font-semibold tabular-nums text-white">
+              {money(price)}
+            </span>
+            {priceType === "listing" && (
+              <span
+                className="text-[9px] font-medium uppercase tracking-wide text-amber-400/80"
+                title="TCGplayer has no confirmed market price for this card — this is a current seller asking price."
+              >
+                asking · no market
+              </span>
+            )}
           </span>
 
           {change && (

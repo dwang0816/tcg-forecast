@@ -102,6 +102,7 @@ export default async function ProductsPage({
                 rarity={row.rarity}
                 number={row.number}
                 price={row.curPrice}
+                priceType={row.priceType}
                 gameSlug={row.game}
                 showBadge
               />

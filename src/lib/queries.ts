@@ -23,6 +23,8 @@ export interface MoverRow {
   pctChange: number;
 }
 
+export type PriceType = "market" | "listing";
+
 export interface ValuableRow {
   game: string;
   productId: number;
@@ -34,6 +36,8 @@ export interface ValuableRow {
   number: string | null;
   subTypeName: string;
   curPrice: number;
+  /** "market" = TCGplayer market price; "listing" = fallback asking price (no confirmed market). */
+  priceType: PriceType;
 }
 
 // Drizzle's neon-http driver returns results on `.rows`.
@@ -136,26 +140,42 @@ export async function getMostValuable({
   const gameFilter = game ? sql`AND c.game = ${game}` : sql``;
   const isSingle = kind === "single";
 
+  // When there's no market price (thin-market grails), fall back to a sane
+  // listing price: mid, then low, then high — ignoring TCGplayer's >= 99999
+  // "no data" sentinels. Such rows are tagged "listing" so the UI can label them.
   const res = await db.execute(sql`
-    WITH latest AS (SELECT max(date) AS d FROM price_snapshots)
+    WITH latest AS (SELECT max(date) AS d FROM price_snapshots),
+    rows AS (
+      SELECT
+        c.game, c.product_id, c.name, c.group_name, c.image_url, c.url,
+        c.rarity, c.number, ps.sub_type_name,
+        COALESCE(
+          ps.market_price,
+          (CASE WHEN ps.mid_price  < 99999 THEN ps.mid_price  END),
+          (CASE WHEN ps.low_price  < 99999 THEN ps.low_price  END),
+          (CASE WHEN ps.high_price < 99999 THEN ps.high_price END)
+        ) AS price,
+        (ps.market_price IS NOT NULL) AS is_market
+      FROM price_snapshots ps
+      JOIN latest ON ps.date = latest.d
+      JOIN cards c ON c.product_id = ps.product_id
+      WHERE c.is_single = ${isSingle} ${gameFilter}
+    )
     SELECT
-      c.game            AS "game",
-      c.product_id      AS "productId",
-      c.name            AS "name",
-      c.group_name      AS "groupName",
-      c.image_url       AS "imageUrl",
-      c.url             AS "url",
-      c.rarity          AS "rarity",
-      c.number          AS "number",
-      ps.sub_type_name  AS "subTypeName",
-      ps.market_price   AS "curPrice"
-    FROM price_snapshots ps
-    JOIN latest ON ps.date = latest.d
-    JOIN cards c ON c.product_id = ps.product_id
-    WHERE ps.market_price IS NOT NULL
-      AND c.is_single = ${isSingle}
-      ${gameFilter}
-    ORDER BY ps.market_price DESC
+      game         AS "game",
+      product_id   AS "productId",
+      name         AS "name",
+      group_name   AS "groupName",
+      image_url    AS "imageUrl",
+      url          AS "url",
+      rarity       AS "rarity",
+      number       AS "number",
+      sub_type_name AS "subTypeName",
+      price        AS "curPrice",
+      CASE WHEN is_market THEN 'market' ELSE 'listing' END AS "priceType"
+    FROM rows
+    WHERE price IS NOT NULL
+    ORDER BY price DESC
     LIMIT ${limit}
   `);
 
