@@ -63,6 +63,21 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_listing_price double precision;
 -- skip cards it already failed on rather than burning the API quota again.
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_photo_at      timestamp;
 
+-- Human review of those photos (see /admin/photos).
+--
+-- No matcher can tell a good photo from a bad one — it can only tell whether the
+-- TITLE is plausible. Whether the picture is sleeved, blurry, cropped, showing
+-- both halves of a LEGEND card, or of the wrong printing entirely is a question
+-- only eyes answer. 'good' | 'bad' | null (not yet looked at).
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_verdict      text;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_reviewed_at  timestamp;
+
+-- Photos a human has rejected. Load-bearing: rejecting clears ebay_photo_url, so
+-- without this the next `pnpm run photos` run would cheerfully find the same
+-- listing again and put the same bad picture back. Keyed on the image URL rather
+-- than the listing, because sellers relist.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS rejected_photo_urls text[];
+
 -- Everything we search, lowercased into one blob. Token-AND against this is what
 -- lets keywords come from different fields.
 ALTER TABLE cards DROP COLUMN IF EXISTS search_text;

@@ -40,7 +40,8 @@ async function main() {
            -- does the title need to name the set (see matchesCard).
            (SELECT count(*) FROM cards o
              WHERE o.game = cards.game AND o.language = cards.language
-               AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous
+               AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
+           rejected_photo_urls
     FROM cards
     WHERE tracked
       AND number IS NOT NULL
@@ -60,6 +61,7 @@ async function main() {
     language: string;
     market_price: number | null;
     ambiguous: boolean;
+    rejected_photo_urls: string[] | null;
   }>(res);
 
   console.log(`${cards.length} cards to look up (most valuable first)\n`);
@@ -73,6 +75,7 @@ async function main() {
       groupName: c.group_name,
       language: c.language,
       ambiguous: c.ambiguous,
+      rejectedPhotoUrls: c.rejected_photo_urls,
     });
 
     // Stamp the timestamp either way: a miss is worth remembering so the next run

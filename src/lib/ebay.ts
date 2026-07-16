@@ -232,6 +232,12 @@ export async function findListingPhoto(
     game: string;
     /** See matchesCard(): does name+number identify one printing, or several? */
     ambiguous: boolean;
+    /**
+     * Image URLs a human rejected in /admin/photos. Skipping these is what stops
+     * a rerun rediscovering the same listing and quietly putting the same bad
+     * picture back — undoing the review.
+     */
+    rejectedPhotoUrls?: string[] | null;
   },
 ): Promise<ListingPhoto | null> {
   if (!card.number) return null;
@@ -267,11 +273,12 @@ export async function findListingPhoto(
     .trim();
   const broad = [...new Set([...nameWords, card.number])].filter(Boolean).join(" ").trim();
 
+  const rejected = new Set(card.rejectedPhotoUrls ?? []);
   for (const [q, limit] of [
     [narrow, 10],
     [broad, 25], // wider net needs more rows, since the right one ranks lower
   ] as [string, number][]) {
-    const hit = await searchOnce(token, q, limit, card);
+    const hit = await searchOnce(token, q, limit, card, rejected);
     if (hit) return hit;
     if (q === broad) break;
   }
@@ -284,6 +291,7 @@ async function searchOnce(
   q: string,
   limit: number,
   card: Parameters<typeof matchesCard>[1],
+  rejected: Set<string>,
 ): Promise<ListingPhoto | null> {
   const url =
     `${BROWSE}?q=${encodeURIComponent(q)}&limit=${limit}` +
@@ -307,6 +315,7 @@ async function searchOnce(
 
   for (const it of j.itemSummaries ?? []) {
     if (!it.image?.imageUrl || !it.itemWebUrl) continue;
+    if (rejected.has(it.image.imageUrl)) continue; // a human already said no
     if (!matchesCard(it.title, card)) continue; // card carries groupName+game
     return {
       imageUrl: it.image.imageUrl,
