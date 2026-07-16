@@ -3,6 +3,7 @@ import { money, percent, signedMoney } from "@/lib/format";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
+import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 
 export interface CardTileProps {
@@ -83,10 +84,7 @@ export function CardTile({
         <div className="line-clamp-2 text-sm font-medium leading-snug text-white/90">
           {name}
         </div>
-        <div className="line-clamp-1 text-xs text-white/40">
-          {groupName}
-          {rarity ? ` · ${rarity}` : ""}
-        </div>
+        <CardIdentity number={number} rarity={rarity} groupName={groupName} />
         {(lowPrice != null || highPrice != null) && (
           <div className="mt-0.5">
             <ConfidenceBadge low={lowPrice ?? null} high={highPrice ?? null} />
