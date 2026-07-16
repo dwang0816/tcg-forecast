@@ -229,7 +229,7 @@ export async function getMostValuable({
     rows AS (
       SELECT
         c.game, c.product_id, c.name, c.group_name, c.image_url, c.alt_image_urls,
-        c.url, c.rarity, c.number, ps.sub_type_name,
+        c.ebay_photo_url, c.url, c.rarity, c.number, ps.sub_type_name,
         ps.market_price AS market,
         ps.low_price, ps.high_price,
         COALESCE(ps.mid_price, ps.low_price, ps.high_price) AS listing
