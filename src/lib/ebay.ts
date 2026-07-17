@@ -125,6 +125,22 @@ const REJECT = [
 /** Normalise for comparison: lowercase, strip punctuation runs. */
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9/\- ]+/g, " ");
 
+/**
+ * The same card number, however a seller chose to type it.
+ *
+ * "004/052", "4/52" and "004 / 052" are one number; leading zeros and spacing are
+ * seller noise, not identity. Non-numeric halves are left alone — "065/M-P" and
+ * "XY176" mean what they say, and Number("m-p") is nonsense.
+ */
+function canonNumber(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .split("/")
+    .map((part) => (/^\d+$/.test(part) ? String(Number(part)) : part))
+    .join("/");
+}
+
 // Words too common in card titles to prove anything.
 const STOP = new Set(["card", "cards", "the", "and"]);
 
@@ -184,12 +200,23 @@ export function matchesCard(
   const applicable = REJECT.filter((re) => !re.test(card.name));
   if (applicable.some((re) => re.test(title))) return false;
 
-  // The number must appear. Accept "014/070" and the bare "014" form sellers use.
+  // The number must appear — BOTH halves of it.
+  //
+  // This used to anchor on the numerator and accept any denominator, so a title
+  // for 004/029 satisfied a request for 004/052: a different card, from a
+  // different set, that happens to be the same Pokémon. Three of those got
+  // through and two were approved, because at a glance they look right.
+  //
+  // The tolerance that fallback was reaching for is real — sellers write
+  // "004 / 052" and "4/52" — so it's kept, by comparing canonically instead of
+  // textually. What's dropped is the pretence that the denominator is optional.
   const num = card.number.trim().toLowerCase();
-  const bare = num.split("/")[0];
+  const wanted = canonNumber(num);
   const hasNumber =
     t.includes(num) ||
-    new RegExp(`\\b${bare.replace(/[^a-z0-9]/g, "")}\\s*/\\s*\\d+`).test(t);
+    [...t.matchAll(/(\d+)\s*\/\s*([0-9a-z-]+)/g)].some(
+      (m) => canonNumber(`${m[1]}/${m[2]}`) === wanted,
+    );
   if (!hasNumber) return false;
 
   // EVERY significant word of the base name, not just one. "Jhin" alone let a
