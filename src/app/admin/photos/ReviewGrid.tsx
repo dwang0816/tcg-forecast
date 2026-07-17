@@ -15,8 +15,10 @@ export interface ReviewCard {
   listingUrl: string | null;
   listingTitle: string | null;
   listingPrice: number | null;
-  /** Photos judged for this card so far — verdicts and rerolls both count. */
+  /** Times a human has called this card good or bad. Rerolls don't count. */
   reviewCount: number;
+  /** What it's currently called, if anything. Re-judging overwrites it. */
+  verdict: "good" | "bad" | null;
   value: number | null;
   valueLabel: string | null;
   priceLabel: string | null;
@@ -32,14 +34,15 @@ export interface ReviewCard {
  * than a slow page.
  */
 /**
- * How many photos this card has burned through.
+ * How many times this card has been called.
  *
- * Hidden at 0 — "reviewed ×0" is just noise on a card nobody has touched. From 2
- * it warms up, because by then the number has stopped being trivia and started
- * being a warning: eBay has offered this card four listings and a human threw
- * out three of them, so the fifth reroll is probably a waste of a click.
+ * One per good/bad verdict — never a reroll, which is a request to see something
+ * else, not a judgement. Hidden at 0: "reviewed ×0" is noise on a card nobody has
+ * reached yet, and 0 is most of the queue.
  *
- * It counts photos judged, not the card's worth. A high number is eBay's fault.
+ * It climbs forever, because the queue is a rotation: judge a card and it goes to
+ * the back, not away. A card at 4 has come round four times and been called four
+ * times, which is a record of attention, not a warning.
  */
 function ReviewCount({ n }: { n: number }) {
   if (n < 1) return null;
@@ -47,18 +50,32 @@ function ReviewCount({ n }: { n: number }) {
   const warm = n >= 2;
   return (
     <span
-      title={`${n} photo${n === 1 ? "" : "s"} judged for this card${
-        heavy ? " — eBay is running out of listings for it" : ""
-      }`}
+      title={`Judged ${n} time${n === 1 ? "" : "s"} — this card has come round the queue ${n === 1 ? "once" : `${n} times`}`}
       className={`shrink-0 rounded border px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
         heavy
-          ? "border-down/40 bg-down/[0.12] text-down-bright"
+          ? "border-gold/50 bg-gold/[0.16] text-gold-bright"
           : warm
             ? "border-gold/35 bg-gold/[0.10] text-gold-bright"
             : "border-edge bg-graphite text-ink-faint"
       }`}
     >
       reviewed ×{n}
+    </span>
+  );
+}
+
+/** What this card is called right now, so re-judging is a change, not a guess. */
+function CurrentVerdict({ v }: { v: "good" | "bad" }) {
+  return (
+    <span
+      title={`Currently marked ${v}. Judging it again replaces this and counts as another review.`}
+      className={`shrink-0 rounded border px-1 py-px text-[9px] font-semibold uppercase tracking-wide ${
+        v === "good"
+          ? "border-up/40 bg-up/[0.12] text-up-bright"
+          : "border-down/40 bg-down/[0.12] text-down-bright"
+      }`}
+    >
+      {v === "good" ? "✓ good" : "✕ bad"}
     </span>
   );
 }
@@ -221,6 +238,9 @@ export function ReviewGrid({
                 listingTitle: swap.listingTitle,
                 listingPrice: swap.listingPrice,
                 reviewCount: swap.reviewCount,
+                // A new picture is unjudged — replacePhoto clears the verdict
+                // server-side, so the badge has to drop it here too.
+                verdict: null,
                 priceLabel:
                   swap.listingPrice != null
                     ? `$${swap.listingPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -277,6 +297,7 @@ export function ReviewGrid({
                     {c.rarity ? ` · ${c.rarity}` : ""}
                   </span>
                   <ReviewCount n={c.reviewCount} />
+                  {c.verdict && <CurrentVerdict v={c.verdict} />}
                 </div>
                 <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-ink-faint/70">
                   {c.gameName}
@@ -318,6 +339,10 @@ export function ReviewGrid({
               )}
 
               <div className="mt-auto flex flex-col gap-2 pt-1">
+                {/* Undo only exists on the Good and Rejected views, where it
+                    means "un-call this card" — back to never-judged, count and
+                    all. In the queue you don't need it: a card already carries
+                    its verdict and you just call it again. */}
                 {reviewed ? (
                   <button
                     onClick={() => unjudge(c.productId)}

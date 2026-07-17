@@ -87,9 +87,9 @@ export const cards = pgTable(
      */
     rejectedPhotoUrls: text("rejected_photo_urls").array(),
     /**
-     * Photos judged by a human for this card — verdicts and rerolls both count.
-     * A high number means eBay keeps offering this card bad listings, not that
-     * the reviewer is indecisive.
+     * How many times a human has called this card good or bad. Rerolls don't
+     * count — the queue rotates judged cards back around, so this is the card's
+     * running review history, not a measure of eBay's supply.
      */
     photoReviewCount: integer("photo_review_count").notNull().default(0),
 

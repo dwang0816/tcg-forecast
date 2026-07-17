@@ -61,13 +61,29 @@ export default async function AdminPhotosPage({
     const db = getDb();
     const rowsOf = <T,>(r: unknown) => ((r as { rows?: T[] }).rows ?? []);
 
+    // The queue holds every card with a photo, judged or not — a verdict sends a
+    // card to the back, it doesn't remove it. Good and Rejected stay as plain
+    // filtered views of the same cards.
     const filter =
       show === "todo"
-        ? sql`ebay_photo_url IS NOT NULL AND photo_verdict IS NULL`
+        ? sql`ebay_photo_url IS NOT NULL`
         : show === "good"
           ? sql`photo_verdict = 'good'`
           : sql`photo_verdict = 'bad'`;
     const gameFilter = game === "all" ? sql`TRUE` : sql`game = ${game}`;
+
+    // Never-judged first, most valuable of those first. Then the judged ones,
+    // oldest verdict first — the longer ago you called a card, the sooner it
+    // comes back round. Judge something and it lands at the very back, because
+    // its verdict is now the newest one there is.
+    const order =
+      show === "todo"
+        ? sql`
+            (photo_verdict IS NOT NULL),
+            photo_reviewed_at ASC NULLS FIRST,
+            COALESCE(market_price, listing_price) DESC NULLS LAST,
+            name`
+        : sql`COALESCE(market_price, listing_price) DESC NULLS LAST, name`;
 
     const [cards, counts] = await Promise.all([
       db.execute(sql`
@@ -76,10 +92,11 @@ export default async function AdminPhotosPage({
                ebay_listing_url AS "listingUrl", ebay_listing_title AS "listingTitle",
                ebay_listing_price AS "listingPrice",
                photo_review_count AS "reviewCount",
+               photo_verdict AS "verdict",
                COALESCE(market_price, listing_price) AS "value"
         FROM cards
         WHERE ${filter} AND ${gameFilter}
-        ORDER BY COALESCE(market_price, listing_price) DESC NULLS LAST, name
+        ORDER BY ${order}
         LIMIT ${PAGE}
       `),
       // Per game, not just the selected one: the picker needs every pile's
@@ -149,8 +166,12 @@ export default async function AdminPhotosPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-xl border border-edge bg-panel p-1">
+          {/* The queue holds every card with a photo, so its badge is the whole
+              rotation, not what's left. "How many have never been called" is the
+              progress line's job, and it's the one number that can't be read off
+              a tab that never empties. */}
           <Tab href={href({ show: "todo" })} active={show === "todo"}>
-            To review <Count n={counts.todo} />
+            Queue <Count n={total} />
           </Tab>
           <Tab href={href({ show: "good" })} active={show === "good"}>
             Good <Count n={counts.good} />
@@ -161,7 +182,9 @@ export default async function AdminPhotosPage({
         </div>
         <div className="flex items-center gap-4">
           <p className="font-mono text-[11px] tabular-nums text-ink-faint">
-            {done} of {total} reviewed
+            {counts.todo > 0
+              ? `${counts.todo} never judged · ${done} of ${total}`
+              : `all ${total} judged at least once`}
             {total > 0 && ` · ${Math.round((done / total) * 100)}%`}
           </p>
           <RefreshButton />
@@ -171,9 +194,7 @@ export default async function AdminPhotosPage({
       {enriched.length === 0 ? (
         <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-12 text-center text-sm text-ink-dim">
           {show === "todo"
-            ? gameLabel
-              ? `${gameLabel} is done — every photo in it has a verdict. Pick another pile above.`
-              : "Nothing left to review. Every photo has a verdict."
+            ? `No ${gameLabel ? `${gameLabel} ` : ""}card here has a photo to judge yet. They arrive on the next photo run.`
             : `No ${gameLabel ? `${gameLabel} ` : ""}photos ${
                 show === "good" ? "approved" : "rejected"
               } yet.`}
@@ -204,9 +225,11 @@ export default async function AdminPhotosPage({
         </>
       )}
 
-      {show === "todo" && counts.todo > PAGE && (
+      {show === "todo" && total > PAGE && (
         <p className="text-center font-mono text-[11px] text-ink-faint">
-          Showing the {PAGE} most valuable. Judge these and the next {PAGE} appear.
+          {counts.todo > 0
+            ? `${PAGE} at a time, never-judged first. Judge these and the next ${PAGE} come up.`
+            : `${PAGE} at a time, longest-unseen first. Judge one and it goes to the back — the queue doesn't run out.`}
         </p>
       )}
     </Shell>
@@ -226,7 +249,11 @@ function Shell({ children }: { children: React.ReactNode }) {
           These cards have no official art, so the site shows a photo from a live
           eBay listing. Is it actually this card, and can you see it? Reject
           anything sleeved beyond recognition, cropped, showing the wrong printing,
-          or showing more than one card.
+          or showing more than one card.{" "}
+          <span className="text-ink-faint">
+            Nothing here is final: a verdict sends the card to the back of the
+            queue, not out of it, so anything you called can be called again.
+          </span>
         </p>
       </div>
       {children}

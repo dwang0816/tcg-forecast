@@ -190,8 +190,11 @@ export async function replacePhoto(productId: number): Promise<{
       ebay_photo_at      = now(),
       -- A new photo is unjudged, whatever the old one's verdict was.
       photo_verdict      = NULL,
-      photo_reviewed_at  = NULL,
-      photo_review_count = photo_review_count + 1
+      photo_reviewed_at  = NULL
+      -- photo_review_count deliberately untouched: the tally counts VERDICTS,
+      -- and asking to see a different picture isn't one. Counting rerolls made
+      -- the number say "how many photos went past" when what it has to say is
+      -- "how many times a human called this card".
     WHERE product_id = ${productId}
   `);
 
@@ -206,7 +209,8 @@ export async function replacePhoto(productId: number): Promise<{
     listingUrl: photo.listingUrl,
     listingTitle: photo.title,
     listingPrice: photo.price,
-    reviewCount: c.photo_review_count + 1,
+    // Unchanged by a reroll — see the UPDATE above.
+    reviewCount: c.photo_review_count,
   };
 }
 
