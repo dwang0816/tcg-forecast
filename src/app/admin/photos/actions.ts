@@ -13,18 +13,22 @@ import { ebayToken, ebayConfigured, findListingPhotos } from "@/lib/ebay";
  * about who's calling these.
  */
 
+// The gate is shared by every /admin page, so signing in and out revalidate the
+// whole subtree rather than the photo queue alone. The cookie is already
+// path-independent; it was only the refresh that was parochial, which left you
+// staring at the passcode form on /admin/ingest after a successful unlock.
 export async function submitPasscode(_prev: string | null, form: FormData) {
   const passcode = String(form.get("passcode") ?? "");
   if (!passcode) return "Enter the passcode.";
   const ok = await signIn(passcode);
   if (!ok) return "That passcode isn't right.";
-  revalidatePath("/admin/photos");
+  revalidatePath("/admin", "layout");
   return null;
 }
 
 export async function leave() {
   await signOut();
-  revalidatePath("/admin/photos");
+  revalidatePath("/admin", "layout");
 }
 
 /** The photo shows the right card, clearly enough to be useful. */
