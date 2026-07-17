@@ -260,15 +260,13 @@ export default async function AdminPhotosPage({
         <>
           {show === "bad" && (
             <p className="text-xs leading-relaxed text-ink-faint">
-              Rejecting cleared the picture and blacklisted it, so the photo job
-              can look for a different listing but never that one again. These
-              cards show a blank until it finds one.{" "}
+              Rejecting pulled the picture off the site and blacklisted it, so the
+              photo job can look for a different listing but never that one again.
+              These cards show a blank until it finds one.{" "}
               <strong className="font-medium text-ink-dim">Undo</strong>{" "}
-              lifts the blacklist — the picture returns on the next{" "}
-              <code className="rounded bg-graphite px-1 font-mono text-ink-dim">
-                pnpm run photos
-              </code>{" "}
-              run, not immediately.
+              puts the picture straight back and lifts the blacklist — the card
+              returns to the queue immediately, wearing the photo you rejected, for
+              you to call again.
             </p>
           )}
           {show === "good" && (

@@ -47,6 +47,11 @@ export async function approve(productId: number) {
  * Remembering the URL is the whole point. Clearing ebay_photo_url alone would let
  * the next `pnpm run photos` run rediscover the same listing and put the same bad
  * picture straight back — the reviewer's work would quietly undo itself.
+ *
+ * The listing's url, title and price stay. Only the photo url has to go, because
+ * that's the one the site renders and the caption is gated on it — a blanked card
+ * shows nothing either way. Throwing the rest away as well left Undo with nothing
+ * to rebuild from, so an undone rejection fell out of every tab at once.
  */
 export async function reject(productId: number) {
   if (!(await isAdmin())) throw new Error("Not signed in");
@@ -59,12 +64,12 @@ export async function reject(productId: number) {
             ELSE array_append(COALESCE(rejected_photo_urls, '{}'), ebay_photo_url)
           END,
         ebay_photo_url = NULL,
-        ebay_listing_url = NULL,
-        ebay_listing_title = NULL,
-        ebay_listing_price = NULL,
         -- Clearing this lets the photo job look again, now that it knows to skip
         -- the URL just rejected.
         ebay_photo_at = NULL,
+        -- The arrival this marked is gone, so it isn't new any more. Undo would
+        -- otherwise hand the card back wearing a flame it didn't earn.
+        photo_found_at = NULL,
         photo_verdict = 'bad',
         photo_reviewed_at = now(),
         photo_review_count = photo_review_count + 1
@@ -237,27 +242,43 @@ export async function refreshCache() {
 export async function undo(productId: number) {
   if (!(await isAdmin())) throw new Error("Not signed in");
   const db = getDb();
-  // Clearing the verdict alone was a trap. Reject blacklists the photo URL and
-  // clears the photo, so a verdict-only undo left the card with no photo, no
-  // verdict, and a permanent blacklist entry — invisible in all three tabs (To
-  // review needs a photo; Good and Bad need a verdict) and unrecoverable, because
-  // the photo job skips blacklisted URLs. One mis-click and the card was gone.
+  // Undo has to put the PICTURE back, not just clear the verdict.
   //
-  // So undoing a rejection also lifts the blacklist. The photo itself can't come
-  // back here — reject dropped the listing url/title/price and we don't keep them
-  // — but the next `pnpm run photos` can now re-find that listing instead of
-  // skipping it forever.
+  // Rejecting blanks the photo, so a verdict-only undo left the card with no
+  // photo and no verdict: invisible in all three tabs at once — the Queue needs a
+  // photo, Good and Rejected need a verdict — and stuck there until someone
+  // remembered to run the photo job by hand. One mis-click and the card was gone
+  // from the UI entirely. That's the bug this fixes.
+  //
+  // The photo url is the last blacklist entry (reject appended it), and reject no
+  // longer discards the listing's url/title/price, so restoring is just putting
+  // that url back and popping it off the blacklist. Everything in one statement,
+  // where every right-hand side still sees the pre-UPDATE row.
   await db.execute(sql`
     UPDATE cards SET
       photo_verdict = NULL,
       photo_reviewed_at = NULL,
+      ebay_photo_url = CASE
+        WHEN photo_verdict = 'bad'
+          AND ebay_photo_url IS NULL
+          AND COALESCE(array_length(rejected_photo_urls, 1), 0) > 0
+          THEN rejected_photo_urls[array_length(rejected_photo_urls, 1)]
+        ELSE ebay_photo_url
+      END,
       rejected_photo_urls = CASE
         WHEN photo_verdict = 'bad' AND array_length(rejected_photo_urls, 1) > 0
           THEN rejected_photo_urls[1:array_length(rejected_photo_urls, 1) - 1]
         ELSE rejected_photo_urls
       END,
-      -- Null means "never asked", which puts it back in the photo job's queue.
-      ebay_photo_at = CASE WHEN photo_verdict = 'bad' THEN NULL ELSE ebay_photo_at END,
+      -- Only when there was nothing to restore. Null means "never asked", which
+      -- re-queues the card for the photo job — the right move for a card left
+      -- blank, and pointless for one that just got its picture back.
+      ebay_photo_at = CASE
+        WHEN photo_verdict = 'bad'
+          AND COALESCE(array_length(rejected_photo_urls, 1), 0) = 0
+          THEN NULL
+        ELSE ebay_photo_at
+      END,
       -- Undo means "that one didn't count", so the tally gives the look back.
       -- greatest() rather than a bare -1: the count is the floor of the review
       -- history, and no sequence of clicks should ever drive it negative.

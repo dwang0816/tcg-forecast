@@ -346,7 +346,7 @@ export function ReviewGrid({
                     title={
                       c.photoUrl
                         ? "Clear this verdict and put the card back in the queue."
-                        : "Clear this verdict and un-blacklist the photo, so a photo run can find it again."
+                        : "Put the rejected picture back, lift its blacklist, and return the card to the queue."
                     }
                   >
                     Undo
