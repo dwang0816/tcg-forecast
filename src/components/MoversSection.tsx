@@ -49,6 +49,7 @@ export function MoversSection({
               subTypeName={row.subTypeName}
               rarity={row.rarity}
               number={row.number}
+              setCode={row.setCode}
               price={row.curPrice}
               change={{ pct: row.pctChange, abs: row.absChange }}
               lowPrice={row.lowPrice}

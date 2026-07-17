@@ -247,6 +247,57 @@ export async function ingestGame(
   // group by set (an image-less "Booster Case" borrows the set's booster box).
   // Ordered by productId so earlier (usually complete) products come first.
   /**
+   * The set's own code — OP05, EB01, ST26 — worked out from the singles in it.
+   *
+   * TCGplayer doesn't give us one, but its singles carry it: every card in
+   * "Awakening of the New Era" is numbered OP05-xxx. Sealed products have no
+   * number at all, so a booster box otherwise never says OP05 anywhere — and that
+   * code is the first thing a One Piece buyer looks for.
+   *
+   * The threshold is the whole point. Real sets are near-unanimous: Romance Dawn
+   * is 100% OP01, Awakening 95% OP05. Reprint sets are not — "Premium Booster
+   * -The Best-" draws from OP01 through OP09 and its most common prefix is OP05
+   * with 21% of the set. Stamping OP05 on that box would be a confident lie, so
+   * anything short of a real majority gets no code at all.
+   *
+   * Games whose numbers carry no code (Pokémon's "105/112", Riftbound's
+   * "181/219") simply never match, and get null — which is correct, they have no
+   * such code to show.
+   */
+  const SET_CODE_DOMINANCE = 0.6;
+  const codeOf = (n: string | null | undefined) =>
+    n?.match(/^([A-Za-z]{2,4}\d{2})-/)?.[1]?.toUpperCase() ?? null;
+
+  const codeTally = new Map<number, Map<string, number>>();
+  for (const c of cardRows) {
+    if (!c.isSingle) continue;
+    const code = codeOf(c.number);
+    if (!code) continue;
+    const tally = codeTally.get(c.groupId) ?? new Map<string, number>();
+    tally.set(code, (tally.get(code) ?? 0) + 1);
+    codeTally.set(c.groupId, tally);
+  }
+  const setCodeByGroup = new Map<number, string>();
+  for (const [groupId, tally] of codeTally) {
+    let best: string | null = null;
+    let bestN = 0;
+    let total = 0;
+    for (const [code, n] of tally) {
+      total += n;
+      if (n > bestN) {
+        best = code;
+        bestN = n;
+      }
+    }
+    if (best && total > 0 && bestN / total >= SET_CODE_DOMINANCE) {
+      setCodeByGroup.set(groupId, best);
+    }
+  }
+  for (const c of cardRows) {
+    c.setCode = setCodeByGroup.get(c.groupId) ?? null;
+  }
+
+  /**
    * Who may lend a picture to whom.
    *
    * Scoped to the SET, not just the number. Card numbers are only unique within
@@ -299,6 +350,7 @@ export async function ingestGame(
           url: sql`excluded.url`,
           rarity: sql`excluded.rarity`,
           number: sql`excluded.number`,
+          setCode: sql`excluded.set_code`,
           extended: sql`excluded.extended`,
           altImageUrls: sql`excluded.alt_image_urls`,
           isSingle: sql`excluded.is_single`,

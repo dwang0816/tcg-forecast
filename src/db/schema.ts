@@ -37,6 +37,8 @@ export const cards = pgTable(
     url: text("url"), // tcgplayer product page
     rarity: text("rarity"),
     number: text("number"),
+    /** Set code (OP05, EB01) derived at ingest from the set's singles. */
+    setCode: text("set_code"),
     // The rest of TCGplayer's extendedData (card text, HP, attacks, colour, cost,
     // power, subtypes…). It ships in the same payload we already download, and
     // it's what makes a card page worth reading.

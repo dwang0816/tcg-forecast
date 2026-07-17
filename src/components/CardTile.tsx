@@ -17,6 +17,7 @@ export interface CardTileProps {
   subTypeName: string;
   rarity: string | null;
   number: string | null;
+  setCode?: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
   /** Listing spread, for the confidence badge. */
@@ -41,6 +42,7 @@ export function CardTile({
   subTypeName,
   rarity,
   number,
+  setCode,
   price,
   change,
   lowPrice,
@@ -94,7 +96,7 @@ export function CardTile({
         <div className="line-clamp-2 text-sm font-medium leading-snug text-white/90">
           {name}
         </div>
-        <CardIdentity number={number} rarity={rarity} groupName={groupName} />
+        <CardIdentity number={number} setCode={setCode} rarity={rarity} groupName={groupName} />
         {(lowPrice != null || highPrice != null) && (
           <div className="mt-0.5">
             <ConfidenceBadge low={lowPrice ?? null} high={highPrice ?? null} />

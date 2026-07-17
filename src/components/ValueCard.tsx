@@ -67,6 +67,7 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
           <div className="mt-0.5">
             <CardIdentity
               number={row.number}
+              setCode={row.setCode}
               rarity={row.rarity}
               groupName={row.groupName}
             />

@@ -78,6 +78,19 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_reviewed_at  timestamp;
 -- than the listing, because sellers relist.
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS rejected_photo_urls text[];
 
+-- The set's own code — OP05, EB01, ST26 — derived at ingest from the numbers of
+-- the singles in the set (see lib/ingest.ts).
+--
+-- Mainly for sealed products: a booster box has no card number, so without this
+-- "Awakening of the New Era - Booster Box Case" never says OP05 anywhere, which
+-- is the first thing a One Piece buyer looks for. Singles already carry it inside
+-- their number, so this just makes it available to everything in the set.
+--
+-- Null when no code dominates. Reprint sets like "Premium Booster -The Best-"
+-- draw cards from OP01 through OP09; its most common prefix is OP05 with 21% of
+-- the set, and stamping OP05 on that box would be a lie.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS set_code text;
+
 -- Everything we search, lowercased into one blob. Token-AND against this is what
 -- lets keywords come from different fields.
 ALTER TABLE cards DROP COLUMN IF EXISTS search_text;
@@ -89,6 +102,10 @@ ALTER TABLE cards ADD COLUMN search_text text
       COALESCE(group_name, '') || ' ' ||
       COALESCE(rarity, '')     || ' ' ||
       COALESCE(number, '')     || ' ' ||
+      -- So "OP05 booster box" finds the box. A sealed product has no number, so
+      -- without this the set code is unsearchable for exactly the products people
+      -- search for it by.
+      COALESCE(set_code, '')   || ' ' ||
       COALESCE(game, '')       || ' ' ||
       COALESCE(language, '')
     )

@@ -19,21 +19,28 @@
  */
 export function CardIdentity({
   number,
+  setCode,
   rarity,
   groupName,
 }: {
   number: string | null;
+  /** Set code (OP05, EB01). Fills the number slot for sealed products. */
+  setCode?: string | null;
   rarity: string | null;
   groupName: string;
 }) {
+  // A single's number already contains the code (OP05-060), so showing setCode
+  // too would just stutter. Sealed has no number, and the code is exactly what a
+  // One Piece buyer scans for — so it takes the empty slot.
+  const lead = number ?? setCode ?? null;
   return (
     <div className="flex flex-col gap-0.5">
-      {(number || rarity) && (
+      {(lead || rarity) && (
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs leading-snug">
-          {number && (
-            <span className="font-medium tabular-nums text-white/65">{number}</span>
+          {lead && (
+            <span className="font-medium tabular-nums text-white/65">{lead}</span>
           )}
-          {number && rarity && (
+          {lead && rarity && (
             <span aria-hidden className="text-white/20">
               ·
             </span>

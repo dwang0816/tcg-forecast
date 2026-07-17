@@ -17,6 +17,8 @@ export interface MoverRow {
   url: string | null;
   rarity: string | null;
   number: string | null;
+  /** Set code (OP05, EB01) — mainly so sealed products can show one. */
+  setCode: string | null;
   subTypeName: string;
   curPrice: number;
   prevPrice: number;
@@ -41,6 +43,8 @@ export interface ValuableRow {
   url: string | null;
   rarity: string | null;
   number: string | null;
+  /** Set code (OP05, EB01) — mainly so sealed products can show one. */
+  setCode: string | null;
   subTypeName: string;
   /** TCGplayer market price (sales-based). Null when TCGplayer has none. */
   marketPrice: number | null;
@@ -162,6 +166,8 @@ export async function getMovers({
       c.url             AS "url",
       c.rarity          AS "rarity",
       c.number          AS "number",
+    c.set_code        AS "setCode",
+      c.set_code        AS "setCode",
       cur.sub_type_name AS "subTypeName",
       cur.market_price  AS "curPrice",
       cur.low_price     AS "lowPrice",
@@ -360,6 +366,7 @@ export interface CardDetail {
   groupName: string;
   rarity: string | null;
   number: string | null;
+  setCode: string | null;
   imageUrl: string | null;
   altImageUrls: string[] | null;
   /**
@@ -397,6 +404,7 @@ export async function getCard(productId: number): Promise<CardDetail | null> {
       group_name     AS "groupName",
       rarity         AS "rarity",
       number         AS "number",
+      set_code       AS "setCode",
       image_url      AS "imageUrl",
       alt_image_urls AS "altImageUrls",
       ebay_photo_url     AS "ebayPhotoUrl",
@@ -493,6 +501,7 @@ export async function searchCards({
     c.url             AS "url",
     c.rarity          AS "rarity",
     c.number          AS "number",
+    c.set_code        AS "setCode",
     'Normal'          AS "subTypeName",
     c.market_price    AS "marketPrice",
     c.listing_price   AS "listingPrice",

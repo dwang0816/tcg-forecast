@@ -1,10 +1,26 @@
-import { money, percent } from "@/lib/format";
+import { money, percent, percentPlain } from "@/lib/format";
+import { confidenceFactor, spreadRatio } from "@/lib/confidence";
 
 export interface MoverExample {
   name: string;
   from: number;
   to: number;
   pct: number;
+}
+
+/**
+ * Two real cards from the list below: the one that came first, and the one that
+ * moved most — when they aren't the same card.
+ *
+ * That disagreement is the single most confusing thing about these lists, and
+ * until now nothing on the page explained it. "Calm beats wild" hinted that a
+ * small % can outrank a big one, but never said the ORDER is % x trust, so a
+ * reader seeing +169% sitting below +118% could only conclude the ranking was
+ * broken.
+ */
+export interface RankExample {
+  top: { name: string; pct: number; low: number | null; high: number | null };
+  biggest: { name: string; pct: number; low: number | null; high: number | null };
 }
 
 /**
@@ -23,6 +39,7 @@ export function MethodologyNote({
   fromDate,
   toDate,
   example,
+  ranking,
 }: {
   windowDays: number;
   actualDays?: number;
@@ -30,9 +47,25 @@ export function MethodologyNote({
   fromDate?: string;
   toDate?: string;
   example?: MoverExample;
+  ranking?: RankExample;
 }) {
   const period = actualDays && actualDays !== windowDays ? actualDays : windowDays;
   const up = example ? example.pct >= 0 : true;
+
+  // Only worth explaining the ordering when this list actually demonstrates it —
+  // i.e. the card on top isn't the one that moved most. On a day where they're the
+  // same card there's nothing surprising to justify, and the box would be noise.
+  const puzzle =
+    ranking && ranking.top.name !== ranking.biggest.name
+      ? {
+          top: ranking.top,
+          biggest: ranking.biggest,
+          topSpread: spreadRatio(ranking.top.low, ranking.top.high),
+          bigSpread: spreadRatio(ranking.biggest.low, ranking.biggest.high),
+          topFactor: confidenceFactor(ranking.top.low, ranking.top.high),
+          bigFactor: confidenceFactor(ranking.biggest.low, ranking.biggest.high),
+        }
+      : null;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
@@ -99,6 +132,63 @@ export function MethodologyNote({
           push it down. So a small % can sit above a big one.
         </Rule>
       </div>
+
+      {/* The order, explained with the two cards actually on screen. Abstractly
+          ("we weight by confidence") this never lands; with the reader's own #1
+          sitting next to a bigger number that lost, it lands immediately. */}
+      {puzzle && (
+        <div className="mt-4 rounded-xl border border-white/[0.07] bg-black/25 p-4">
+          <h4 className="text-sm font-medium text-white/80">
+            Why isn&apos;t the biggest jump at the top?
+          </h4>
+          <p className="mt-1.5 text-xs leading-relaxed text-white/45">
+            <strong className="font-medium text-white/70">{puzzle.biggest.name}</strong>{" "}
+            moved {percentPlain(puzzle.biggest.pct)} — more than{" "}
+            <strong className="font-medium text-white/70">{puzzle.top.name}</strong>{" "}
+            at {percentPlain(puzzle.top.pct)}. But {puzzle.top.name}{" "}
+            is #1. Here&apos;s why:
+          </p>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Compare
+              name={puzzle.top.name}
+              pct={puzzle.top.pct}
+              spread={puzzle.topSpread}
+              factor={puzzle.topFactor}
+              winner
+            />
+            <Compare
+              name={puzzle.biggest.name}
+              pct={puzzle.biggest.pct}
+              spread={puzzle.bigSpread}
+              factor={puzzle.bigFactor}
+            />
+          </div>
+
+          <p className="mt-3 text-xs leading-relaxed text-white/45">
+            {puzzle.bigSpread != null && puzzle.topSpread != null ? (
+              <>
+                Sellers agree on {puzzle.top.name} — the dearest copy costs{" "}
+                {puzzle.topSpread.toFixed(1)}× the cheapest. On {puzzle.biggest.name}{" "}
+                they don&apos;t: {puzzle.bigSpread.toFixed(1)}×. When the price is
+                that unsettled, a big % is mostly noise, so we count only{" "}
+                {Math.round(puzzle.bigFactor * 100)}% of it.
+              </>
+            ) : (
+              <>
+                We know what sellers are asking for {puzzle.top.name}, and we
+                don&apos;t for {puzzle.biggest.name} — so we can&apos;t tell whether
+                that bigger move is real, and we count less of it.
+              </>
+            )}{" "}
+            <strong className="font-medium text-white/70">
+              We order these lists by the change after that adjustment, not by the
+              raw %.
+            </strong>{" "}
+            A move you can trust beats a bigger one you can&apos;t.
+          </p>
+        </div>
+      )}
 
       <details className="group mt-4">
         {/* Looks like a real button: the caveats in here (TCGplayer-only prices,
@@ -176,6 +266,69 @@ export function MethodologyNote({
         </div>
       </details>
     </section>
+  );
+}
+
+/** One side of the "why isn't the biggest at the top" comparison. */
+function Compare({
+  name,
+  pct,
+  spread,
+  factor,
+  winner,
+}: {
+  name: string;
+  pct: number;
+  spread: number | null;
+  factor: number;
+  winner?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-3 ${
+        winner ? "border-emerald-500/25 bg-emerald-500/[0.06]" : "border-white/[0.07]"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="line-clamp-1 text-xs font-medium text-white/75">{name}</span>
+        {winner && (
+          <span className="shrink-0 text-[10px] font-semibold text-emerald-400">
+            #1
+          </span>
+        )}
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[11px] text-white/40">
+        <span>
+          moved{" "}
+          <strong className="font-medium tabular-nums text-white/70">
+            {percentPlain(pct)}
+          </strong>
+        </span>
+        <span aria-hidden className="text-white/15">
+          ·
+        </span>
+        <span>
+          sellers{" "}
+          <strong className="font-medium tabular-nums text-white/70">
+            {spread != null ? `${spread.toFixed(1)}×` : "unknown"}
+          </strong>{" "}
+          apart
+        </span>
+      </div>
+      <div className="mt-1.5 text-[11px] text-white/45">
+        counts for{" "}
+        <strong
+          className={`font-semibold tabular-nums ${
+            factor >= 0.8 ? "text-emerald-400" : factor >= 0.55 ? "text-amber-400" : "text-rose-400"
+          }`}
+        >
+          {Math.round(factor * 100)}%
+        </strong>{" "}
+        <span className="tabular-nums text-white/30">
+          → {percentPlain(pct * factor)}
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -151,6 +151,25 @@ async function ViewContent({
                 }
               : undefined
           }
+          // #1 and the card that actually moved most. When they differ, the note
+          // explains the ordering with them; when they're the same card there's
+          // nothing to explain and it stays quiet.
+          ranking={
+            movers.length > 1
+              ? (() => {
+                  const biggest = movers.reduce((a, b) =>
+                    Math.abs(b.pctChange) > Math.abs(a.pctChange) ? b : a,
+                  );
+                  const pick = (m: (typeof movers)[number]) => ({
+                    name: m.name,
+                    pct: m.pctChange,
+                    low: m.lowPrice,
+                    high: m.highPrice,
+                  });
+                  return { top: pick(movers[0]), biggest: pick(biggest) };
+                })()
+              : undefined
+          }
         />
       )}
 
