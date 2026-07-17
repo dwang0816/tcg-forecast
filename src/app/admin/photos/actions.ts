@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 import { isAdmin, signIn, signOut } from "@/lib/admin";
 import { PRICES_TAG } from "@/lib/cached";
-import { ebayToken, ebayConfigured, findListingPhoto } from "@/lib/ebay";
+import { ebayToken, ebayConfigured, findListingPhotos } from "@/lib/ebay";
 
 /**
  * Every action re-checks isAdmin(). Server Actions are POST endpoints anyone can
@@ -95,10 +95,15 @@ export async function reject(productId: number) {
  * bad, and it left the card blank until someone remembered to run
  * `pnpm run photos` from a laptop. A rejection was a request nobody answered.
  *
- * Excludes the photo on screen from its own search, so it physically cannot hand
- * back the picture you're looking at. Returns the new photo for the caller to
- * swap in place, or null when eBay has nothing else — and null means the card is
- * untouched, not blanked. Nothing is written unless there's a replacement.
+ * A cycle, not a hunt with an end. It walks every listing eBay has for the card
+ * and steps to the next one, wrapping to the first when it runs off the end — so
+ * you can keep clicking and see the whole set again, which is what you want when
+ * you suspect you called one of them wrong. Nothing it shows you is a rejection;
+ * ✕ is the only thing that rejects.
+ *
+ * Returns the photo to swap in, or null when there's nowhere to move (no listings
+ * at all, or exactly one and it's already on screen). Null means the card is
+ * untouched — nothing is written unless the picture actually changes.
  */
 export async function replacePhoto(productId: number): Promise<{
   photoUrl: string;
@@ -131,7 +136,7 @@ export async function replacePhoto(productId: number): Promise<{
            (SELECT count(*) FROM cards o
              WHERE o.game = cards.game AND o.language = cards.language
                AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
-           rejected_photo_urls, ebay_photo_url, photo_review_count
+           ebay_photo_url, photo_review_count
     FROM cards WHERE product_id = ${productId}
   `);
   const c = rowsOf<{
@@ -141,48 +146,39 @@ export async function replacePhoto(productId: number): Promise<{
     number: string | null;
     language: string;
     ambiguous: boolean;
-    rejected_photo_urls: string[] | null;
     ebay_photo_url: string | null;
     photo_review_count: number;
   }>(res)[0];
   if (!c) throw new Error("Card not found");
 
-  // Exclude the photo on screen IN MEMORY rather than blacklisting it first.
-  // The guarantee is the same — findListingPhoto can't hand back a url in this
-  // set, so it finds something genuinely different or nothing — but the database
-  // is untouched until there's actually a replacement to write.
-  const exclude = [...(c.rejected_photo_urls ?? []), c.ebay_photo_url].filter(
-    (u): u is string => Boolean(u),
-  );
-
-  const photo = await findListingPhoto(token, {
+  // Every listing for this card, in one list, so the reroll can walk it.
+  const all = await findListingPhotos(token, {
     game: c.game,
     name: c.name,
     number: c.number,
     groupName: c.group_name,
     language: c.language,
     ambiguous: c.ambiguous,
-    rejectedPhotoUrls: exclude,
   });
+  if (all.length === 0) return null;
 
-  // Nothing else exists. Leave the card exactly as it was and say so.
-  //
-  // This used to blacklist the photo, blank the card and mark it bad, which
-  // turned "show me another" into "destroy the only one I had": the card left
-  // the queue, showed nothing on the site, and the picture couldn't come back,
-  // because the blacklist is what stops the photo job re-finding it. Asking to
-  // see alternatives is not the same as saying the current photo is bad, and
-  // a mediocre photo beats an empty frame. No replacement, no change.
-  if (!photo) return null;
+  // Step to the next one and wrap. Running out isn't a dead end — it's a lap.
+  // Once you've seen everything eBay has, the useful thing is the FIRST photo
+  // again, because by then you may want a second look at one you passed over.
+  // Nothing here is a rejection; that's what ✕ is for.
+  const at = all.findIndex((p) => p.imageUrl === c.ebay_photo_url);
+  const photo = all[(at + 1) % all.length];
+
+  // One listing in the world, and it's already on screen. Nothing to move to,
+  // so nothing changes — the click is a no-op rather than a loss.
+  if (photo.imageUrl === c.ebay_photo_url) return null;
 
   await db.execute(sql`
     UPDATE cards SET
-      -- Now it's earned: there's a better option, so the old one is out. The
-      -- right-hand side sees the pre-UPDATE row, so this appends the OLD photo.
-      rejected_photo_urls = CASE
-        WHEN ebay_photo_url IS NULL THEN rejected_photo_urls
-        ELSE array_append(COALESCE(rejected_photo_urls, '{}'), ebay_photo_url)
-      END,
+      -- rejected_photo_urls deliberately untouched. Flicking past a photo isn't
+      -- rejecting it — the cycle comes back to it on the next lap, and a url in
+      -- that list is one the photo job must never resurrect. Blacklisting here
+      -- meant "show me another" quietly spent the card's only listing.
       ebay_photo_url     = ${photo.imageUrl},
       ebay_listing_url   = ${photo.listingUrl},
       ebay_listing_title = ${photo.title},

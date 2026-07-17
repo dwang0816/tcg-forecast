@@ -272,40 +272,40 @@ export function matchesCard(
  * Queries by number + name + set, which is how the sellers themselves title
  * these ("Arcanine 014/070 Holo Rare HeartGold Collection L1 2009 Pokemon").
  */
-export async function findListingPhoto(
-  token: string,
-  card: {
-    name: string;
-    number: string | null;
-    groupName: string;
-    language: string;
-    game: string;
-    /** See matchesCard(): does name+number identify one printing, or several? */
-    ambiguous: boolean;
-    /**
-     * Image URLs a human rejected in /admin/photos. Skipping these is what stops
-     * a rerun rediscovering the same listing and quietly putting the same bad
-     * picture back — undoing the review.
-     */
-    rejectedPhotoUrls?: string[] | null;
-  },
-): Promise<ListingPhoto | null> {
-  if (!card.number) return null;
+export interface CardQuery {
+  name: string;
+  number: string | null;
+  groupName: string;
+  language: string;
+  game: string;
+  /** See matchesCard(): does name+number identify one printing, or several? */
+  ambiguous: boolean;
+  /**
+   * Image URLs a human rejected in /admin/photos. Skipping these is what stops
+   * a rerun rediscovering the same listing and quietly putting the same bad
+   * picture back — undoing the review.
+   */
+  rejectedPhotoUrls?: string[] | null;
+}
 
-  // Two queries, narrow then broad, because the query's job is RECALL and
-  // matchesCard's job is PRECISION — and conflating them cost us the most
-  // valuable cards on the site.
-  //
-  // eBay ANDs every word. The narrow query below piles on the set name, the
-  // variant qualifiers and the language, and for
-  // "Irelia - Blade Dancer (Metal) (Prize Wall) 195/221" that returns ZERO
-  // results — while "irelia blade dancer 195/221" returns 142, the first page of
-  // which contains the exact card. The card was always on eBay; the query was
-  // simply too specific to find it.
-  //
-  // So: try narrow first (it ranks the right printing highest when it works),
-  // then fall back to name + number alone. Both feed the same strict matcher, so
-  // widening the net can't loosen what we accept — only what we get to consider.
+/**
+ * The two searches to run, narrow first, each with the row count it needs.
+ *
+ * Two queries because the query's job is RECALL and matchesCard's job is
+ * PRECISION — and conflating them cost us the most valuable cards on the site.
+ *
+ * eBay ANDs every word. The narrow query piles on the set name, the variant
+ * qualifiers and the language, and for
+ * "Irelia - Blade Dancer (Metal) (Prize Wall) 195/221" that returns ZERO results
+ * — while "irelia blade dancer 195/221" returns 142, the first page of which
+ * contains the exact card. The card was always on eBay; the query was simply too
+ * specific to find it.
+ *
+ * Narrow first because it ranks the right printing highest when it works; broad
+ * as the fallback. Both feed the same strict matcher, so widening the net can't
+ * loosen what we accept — only what we get to consider.
+ */
+function queriesFor(card: CardQuery): [string, number][] {
   const set = card.groupName.replace(/^[A-Za-z0-9]+:\s*/, "").trim();
   const nameWords = significant(baseName(card.name));
   const narrow = [
@@ -322,27 +322,60 @@ export async function findListingPhoto(
     .join(" ")
     .trim();
   const broad = [...new Set([...nameWords, card.number])].filter(Boolean).join(" ").trim();
-
-  const rejected = new Set(card.rejectedPhotoUrls ?? []);
-  for (const [q, limit] of [
+  // The wider net needs more rows, since the right one ranks lower in it.
+  return [
     [narrow, 10],
-    [broad, 25], // wider net needs more rows, since the right one ranks lower
-  ] as [string, number][]) {
+    [broad, 25],
+  ];
+}
+
+export async function findListingPhoto(
+  token: string,
+  card: CardQuery,
+): Promise<ListingPhoto | null> {
+  if (!card.number) return null;
+  const rejected = new Set(card.rejectedPhotoUrls ?? []);
+  for (const [q, limit] of queriesFor(card)) {
     const hit = await searchOnce(token, q, limit, card, rejected);
     if (hit) return hit;
-    if (q === broad) break;
   }
   return null;
 }
 
+/**
+ * Every listing we'd accept for this card, de-duplicated, best-ranked first.
+ *
+ * This is the reroll's view of the world. It deliberately does NOT skip the
+ * rejected list: the reroll is a human flicking through what's out there, and a
+ * picture you passed on five minutes ago is one you may want back — you might
+ * have been wrong. rejectedPhotoUrls exists to stop the unattended photo job
+ * resurrecting a rejection; it was never meant to stop a person looking.
+ *
+ * Both queries always run, unlike findListingPhoto's short-circuit: you can't
+ * cycle through a list you stopped building at the first hit.
+ */
+export async function findListingPhotos(
+  token: string,
+  card: CardQuery,
+): Promise<ListingPhoto[]> {
+  if (!card.number) return [];
+  const seen = new Map<string, ListingPhoto>();
+  for (const [q, limit] of queriesFor(card)) {
+    for (const p of await searchAll(token, q, limit, card)) {
+      if (!seen.has(p.imageUrl)) seen.set(p.imageUrl, p);
+    }
+  }
+  return [...seen.values()];
+}
+
 /** One Browse search, returning the first result our matcher accepts. */
-async function searchOnce(
+/** Every listing on this page of results that the matcher accepts, in eBay's order. */
+async function searchAll(
   token: string,
   q: string,
   limit: number,
   card: Parameters<typeof matchesCard>[1],
-  rejected: Set<string>,
-): Promise<ListingPhoto | null> {
+): Promise<ListingPhoto[]> {
   const url =
     `${BROWSE}?q=${encodeURIComponent(q)}&limit=${limit}` +
     `&filter=${encodeURIComponent("buyingOptions:{FIXED_PRICE|AUCTION}")}`;
@@ -352,7 +385,7 @@ async function searchOnce(
       "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
     },
   });
-  if (!res.ok) return null;
+  if (!res.ok) return [];
 
   const j = (await res.json()) as {
     itemSummaries?: {
@@ -363,17 +396,29 @@ async function searchOnce(
     }[];
   };
 
+  const out: ListingPhoto[] = [];
   for (const it of j.itemSummaries ?? []) {
     if (!it.image?.imageUrl || !it.itemWebUrl) continue;
-    if (rejected.has(it.image.imageUrl)) continue; // a human already said no
     if (!matchesCard(it.title, card)) continue; // card carries groupName+game
-    return {
+    out.push({
       imageUrl: it.image.imageUrl,
       listingUrl: it.itemWebUrl,
       title: it.title,
       price: it.price?.value ? Number(it.price.value) : null,
       currency: it.price?.currency ?? null,
-    };
+    });
   }
-  return null;
+  return out;
+}
+
+async function searchOnce(
+  token: string,
+  q: string,
+  limit: number,
+  card: Parameters<typeof matchesCard>[1],
+  rejected: Set<string>,
+): Promise<ListingPhoto | null> {
+  const all = await searchAll(token, q, limit, card);
+  // A human already said no to these.
+  return all.find((p) => !rejected.has(p.imageUrl)) ?? null;
 }

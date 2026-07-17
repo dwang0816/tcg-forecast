@@ -105,7 +105,6 @@ export function ReviewGrid({
       }
     >
   >({});
-  const [noneLeft, setNoneLeft] = useState<Record<number, boolean>>({});
   const [, startTransition] = useTransition();
 
   const decide = (id: number, verdict: "good" | "bad") => {
@@ -143,10 +142,10 @@ export function ReviewGrid({
    * there's no sensible thing to show meanwhile except the truth. So the card
    * stays put and says it's looking.
    *
-   * When nothing else exists the card STILL stays put, holding the photo it had.
-   * It used to vanish, which read as a bug: the explanation rendered in a banner
-   * at the top of the grid, so anyone scrolled down judging cards just watched
-   * one evaporate. The answer belongs on the card you're looking at.
+   * Clicking it walks the card's listings and wraps at the end, so it always has
+   * an answer and never needs to explain itself: keep clicking and the old photos
+   * come back round, which is the point — you may want a second look at one you
+   * called too fast.
    */
   const reroll = (id: number) => {
     setHunting((h) => ({ ...h, [id]: true }));
@@ -158,20 +157,9 @@ export function ReviewGrid({
     startTransition(async () => {
       try {
         const photo = await replacePhoto(id);
-        if (photo) {
-          setSwapped((s) => ({ ...s, [id]: photo }));
-          // A fresh photo is a fresh question, so any earlier "nothing else"
-          // note no longer applies.
-          setNoneLeft((n) => {
-            const next = { ...n };
-            delete next[id];
-            return next;
-          });
-        } else {
-          // eBay has nothing else. The card is untouched — it keeps the photo
-          // it had — so it stays in the queue and just explains itself.
-          setNoneLeft((n) => ({ ...n, [id]: true }));
-        }
+        // null means there was nowhere to move — this card has exactly one
+        // listing and you're looking at it. Nothing changed, so nothing is said.
+        if (photo) setSwapped((s) => ({ ...s, [id]: photo }));
       } catch (e) {
         setFailed((f) => ({
           ...f,
@@ -325,19 +313,6 @@ export function ReviewGrid({
                 </p>
               )}
 
-              {/* Sits on the card, not in a banner up top: this is the answer to
-                  a click you made on THIS card, and it has to be where your eyes
-                  already are. */}
-              {noneLeft[c.productId] && !busy && (
-                <p className="rounded border border-gold/30 bg-gold/[0.07] px-2 py-1 text-[11px] leading-snug text-ink-dim">
-                  <strong className="font-semibold text-gold-bright">
-                    That&apos;s the only listing.
-                  </strong>{" "}
-                  eBay has nothing else for this card, so the photo above is
-                  still the best there is — judge it with ✓ or ✕.
-                </p>
-              )}
-
               <div className="mt-auto flex flex-col gap-2 pt-1">
                 {/* Undo only exists on the Good and Rejected views, where it
                     means "un-call this card" — back to never-judged, count and
@@ -380,26 +355,18 @@ export function ReviewGrid({
 
                   {/* Under the verdicts, because it's the third answer to "is
                       this photo any good?" — not "yes" or "no" but "show me a
-                      different one". Goes dead once eBay has been exhausted:
-                      the same search can only return the same nothing, and a
-                      button that re-answers a settled question is a trap. */}
+                      different one". Never goes dead: it cycles, so there's
+                      always a next photo, even if that's one you've already
+                      seen. */}
                   <button
                     onClick={() => reroll(c.productId)}
-                    disabled={busy || !c.photoUrl || Boolean(noneLeft[c.productId])}
+                    disabled={busy || !c.photoUrl}
                     aria-label={`Find a different photo for ${c.name}`}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge py-2 text-xs font-medium text-ink-faint transition-colors hover:border-ink-faint/40 hover:bg-panel-hi hover:text-ink-dim disabled:cursor-not-allowed disabled:opacity-40"
-                    title={
-                      noneLeft[c.productId]
-                        ? "eBay has no other listing for this card — nothing left to find"
-                        : "Look for a different live listing right now. Your photo stays if there's nothing better."
-                    }
+                    title="Show the next listing for this card. Keeps cycling — the earlier photos come back round."
                   >
                     <span aria-hidden>⟳</span>
-                    {busy
-                      ? "Searching eBay…"
-                      : noneLeft[c.productId]
-                        ? "No other listing"
-                        : "Find new photo"}
+                    {busy ? "Searching eBay…" : "Find new photo"}
                   </button>
                   </>
                 )}
