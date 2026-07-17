@@ -33,10 +33,20 @@ const MSRP: Record<string, Partial<Record<ProductType, number>>> = {
   },
 };
 
-// A product released after we'd started tracking has its earliest snapshot
-// clearly past the data floor (~2024-07-16), which dates it to the current era.
-// One at the floor could be any age, so it stays blank rather than get a
-// current-era price it may predate. A month's buffer keeps floor jitter out.
+// The era gate only matters where a format's retail price has drifted over
+// time, so it applies per game. Pokémon has 25 years of history and its box
+// price has moved a lot, so a Pokémon MSRP is only quoted for current-era sets.
+// One Piece (and Riftbound) only exist post-2022 with a single, unchanged retail
+// price, so every set is current — no gate, or the whole back catalogue goes
+// blank for no reason (Awakening of the New Era, OP-05, was doing exactly that).
+const ERA_SENSITIVE_GAMES = new Set(["pokemon"]);
+
+// For an era-sensitive game, a product is current-era when its earliest snapshot
+// sits clearly past our ~2024-07-16 data floor. One at the floor could be any
+// age, so it stays blank rather than get a price it may predate; a month's
+// buffer keeps floor jitter out. (No release date is stored, so the earliest
+// snapshot stands in for one — which is why this can't date pre-tracking sets,
+// and Pokémon coverage is limited to sets released since we started.)
 const MODERN_SINCE = "2024-08-15";
 
 // If a product's all-time low is far above its supposed MSRP, the type/era guess
@@ -96,7 +106,9 @@ export function msrpFor(opts: {
   if (!type) return null;
   const msrp = MSRP[opts.game]?.[type];
   if (msrp == null) return null;
-  if (!opts.earliest || opts.earliest <= MODERN_SINCE) return null;
+  if (ERA_SENSITIVE_GAMES.has(opts.game)) {
+    if (!opts.earliest || opts.earliest <= MODERN_SINCE) return null;
+  }
   if (opts.allTimeLow != null && opts.allTimeLow > msrp * PLAUSIBLE_MULTIPLE) {
     return null;
   }
