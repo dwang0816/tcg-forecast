@@ -415,6 +415,13 @@ export async function ingestGame(
           // The verdict belonged to a photo that no longer exists.
           photoVerdict: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.photoVerdict} END`,
           photoReviewedAt: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.photoReviewedAt} END`,
+          // And so did the tally of photos judged. The count only means anything
+          // for cards art never came for; once it does, the card stops being one
+          // of those, and leaving the number behind would strand it somewhere it
+          // can never be seen or decremented. Unlike rejected_photo_urls this
+          // isn't load-bearing — nothing reads it to make a decision — so there's
+          // nothing to protect by keeping it.
+          photoReviewCount: sql`CASE WHEN excluded.image_url IS NOT NULL THEN 0 ELSE ${cards.photoReviewCount} END`,
 
           updatedAt: sql`now()`,
         },

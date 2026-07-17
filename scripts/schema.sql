@@ -78,6 +78,15 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_reviewed_at  timestamp;
 -- than the listing, because sellers relist.
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS rejected_photo_urls text[];
 
+-- How many photos a human has judged for this card: every verdict and every
+-- reroll adds one. Only ever non-zero for cards with no official art, since
+-- those are the only ones that reach /admin/photos at all.
+--
+-- Real signal, not a scoreboard. A card sitting at 4 has had four different
+-- listings looked at and thrown out, which says eBay is out of good options for
+-- it — worth knowing before you burn a fifth reroll on it.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_review_count int NOT NULL DEFAULT 0;
+
 -- The set's own code — OP05, EB01, ST26 — derived at ingest from the numbers of
 -- the singles in the set (see lib/ingest.ts).
 --

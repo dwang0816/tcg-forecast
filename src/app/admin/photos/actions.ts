@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 import { isAdmin, signIn, signOut } from "@/lib/admin";
 import { PRICES_TAG } from "@/lib/cached";
+import { ebayToken, findListingPhoto } from "@/lib/ebay";
 
 /**
  * Every action re-checks isAdmin(). Server Actions are POST endpoints anyone can
@@ -32,7 +33,8 @@ export async function approve(productId: number) {
   const db = getDb();
   await db.execute(sql`
     UPDATE cards
-    SET photo_verdict = 'good', photo_reviewed_at = now()
+    SET photo_verdict = 'good', photo_reviewed_at = now(),
+        photo_review_count = photo_review_count + 1
     WHERE product_id = ${productId}
   `);
   revalidatePath("/admin/photos");
@@ -64,7 +66,8 @@ export async function reject(productId: number) {
         -- the URL just rejected.
         ebay_photo_at = NULL,
         photo_verdict = 'bad',
-        photo_reviewed_at = now()
+        photo_reviewed_at = now(),
+        photo_review_count = photo_review_count + 1
     WHERE product_id = ${productId}
   `);
   revalidatePath("/admin/photos");
@@ -81,6 +84,110 @@ export async function reject(productId: number) {
   // the tag stale repeatedly without firing off blocking scans of the history
   // table behind each click.
   revalidateTag(PRICES_TAG, "max");
+}
+
+/**
+ * Swap this card's photo for a different live listing.
+ *
+ * The reroll. A photo can be wrong in a way that isn't the card's fault — sleeved,
+ * cropped, two cards on a table — and the right response is "show me another",
+ * not "give up on this card". Before this, ✕ was the only way to say a photo was
+ * bad, and it left the card blank until someone remembered to run
+ * `pnpm run photos` from a laptop. A rejection was a request nobody answered.
+ *
+ * Blacklists the current photo first, then searches with that blacklist applied —
+ * so it physically cannot hand back the picture just rejected. Returns the new
+ * photo for the caller to swap in place, or null when eBay has nothing else, in
+ * which case the card is left blank and marked bad.
+ */
+export async function replacePhoto(productId: number): Promise<{
+  photoUrl: string;
+  listingUrl: string;
+  listingTitle: string;
+  listingPrice: number | null;
+  reviewCount: number;
+} | null> {
+  if (!(await isAdmin())) throw new Error("Not signed in");
+  const token = await ebayToken();
+  if (!token) throw new Error("eBay credentials are missing on the server");
+  const db = getDb();
+  const rowsOf = <T,>(r: unknown) => ((r as { rows?: T[] }).rows ?? []);
+
+  // Blacklist what's on screen now. Doing this BEFORE the search is what makes
+  // the reroll honest: findListingPhoto skips blacklisted urls, so it must find
+  // something genuinely different or nothing at all.
+  //
+  // A reroll is a judgement too — you looked at that photo and turned it down —
+  // so it counts, whether or not the search that follows finds anything.
+  await db.execute(sql`
+    UPDATE cards SET
+      rejected_photo_urls = CASE
+        WHEN ebay_photo_url IS NULL THEN rejected_photo_urls
+        ELSE array_append(COALESCE(rejected_photo_urls, '{}'), ebay_photo_url)
+      END,
+      photo_review_count = photo_review_count + 1
+    WHERE product_id = ${productId}
+  `);
+
+  const res = await db.execute(sql`
+    SELECT product_id, game, name, group_name, number, language,
+           (SELECT count(*) FROM cards o
+             WHERE o.game = cards.game AND o.language = cards.language
+               AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
+           rejected_photo_urls, photo_review_count
+    FROM cards WHERE product_id = ${productId}
+  `);
+  const c = rowsOf<{
+    game: string;
+    name: string;
+    group_name: string;
+    number: string | null;
+    language: string;
+    ambiguous: boolean;
+    rejected_photo_urls: string[] | null;
+    photo_review_count: number;
+  }>(res)[0];
+  if (!c) throw new Error("Card not found");
+
+  const photo = await findListingPhoto(token, {
+    game: c.game,
+    name: c.name,
+    number: c.number,
+    groupName: c.group_name,
+    language: c.language,
+    ambiguous: c.ambiguous,
+    rejectedPhotoUrls: c.rejected_photo_urls,
+  });
+
+  await db.execute(sql`
+    UPDATE cards SET
+      ebay_photo_url     = ${photo?.imageUrl ?? null},
+      ebay_listing_url   = ${photo?.listingUrl ?? null},
+      ebay_listing_title = ${photo?.title ?? null},
+      ebay_listing_price = ${photo?.price ?? null},
+      ebay_photo_at      = now(),
+      -- A new photo is unjudged. Nothing found means the card is blank, which is
+      -- the same outcome as a plain rejection, so it's recorded as one.
+      photo_verdict      = ${photo ? null : "bad"},
+      photo_reviewed_at  = ${photo ? null : sql`now()`}
+    WHERE product_id = ${productId}
+  `);
+
+  revalidatePath("/admin/photos");
+  revalidatePath(`/card/${productId}`);
+  // The tiles cache for a day, so without this the picture you just replaced
+  // stays on every list.
+  revalidateTag(PRICES_TAG, "max");
+
+  return photo
+    ? {
+        photoUrl: photo.imageUrl,
+        listingUrl: photo.listingUrl,
+        listingTitle: photo.title,
+        listingPrice: photo.price,
+        reviewCount: c.photo_review_count,
+      }
+    : null;
 }
 
 /**
@@ -126,7 +233,11 @@ export async function undo(productId: number) {
         ELSE rejected_photo_urls
       END,
       -- Null means "never asked", which puts it back in the photo job's queue.
-      ebay_photo_at = CASE WHEN photo_verdict = 'bad' THEN NULL ELSE ebay_photo_at END
+      ebay_photo_at = CASE WHEN photo_verdict = 'bad' THEN NULL ELSE ebay_photo_at END,
+      -- Undo means "that one didn't count", so the tally gives the look back.
+      -- greatest() rather than a bare -1: the count is the floor of the review
+      -- history, and no sequence of clicks should ever drive it negative.
+      photo_review_count = greatest(0, photo_review_count - 1)
     WHERE product_id = ${productId}
   `);
   revalidatePath("/admin/photos");
