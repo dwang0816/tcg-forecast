@@ -144,6 +144,49 @@ function canonNumber(s: string): string {
 // Words too common in card titles to prove anything.
 const STOP = new Set(["card", "cards", "the", "and"]);
 
+/**
+ * Words that must appear in a title for it to be this card, even when every one
+ * of them is short.
+ *
+ * significant() drops anything under four letters as noise, which is right for
+ * "Irelia - Blade Dancer" and catastrophic for "Old Rod": it leaves NOTHING, and
+ * the caller then skipped the name check entirely, so any listing carrying the
+ * right number matched. Old Rod ended up wearing a photo of a Wooloo, and a
+ * lookup for it returned a Riftbound card — both titles have 011/024 in them and
+ * that was the whole test. 168 cards have names with no word of four letters:
+ * Old Rod, Lux, Mew, N, Uta, Leo, even "Red Card" (card is a stop word, red is
+ * three letters).
+ *
+ * So when the strict filter leaves nothing, fall back to the name as it actually
+ * is. A short word proves less than a long one, but it proves more than nothing.
+ */
+function identifyingWords(name: string): string[] {
+  const strong = significant(name);
+  if (strong.length > 0) return strong;
+  return (
+    norm(name)
+      .split(/\s+/)
+      // Must contain a letter or digit. norm() keeps "-" and "/", and baseName
+      // leaves the hyphen in "Mew - 2023" behind, so without this the fallback
+      // demanded a literal "-" in the title and threw away the correct listing
+      // for Tord Reklev's Mew. Punctuation is not a word.
+      .filter((w) => /[a-z0-9]/.test(w) && !STOP.has(w) && !/^\d+$/.test(w))
+  );
+}
+
+/**
+ * Is this word in the title, as a word?
+ *
+ * Substring matching is fine for the long words significant() yields, but lethal
+ * for the short ones: "n" is inside half the words in English, and a card called
+ * N would match everything. Short words get boundaries.
+ */
+function containsWord(t: string, w: string): boolean {
+  if (w.length >= 4) return t.includes(w);
+  const esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`).test(t);
+}
+
 const significant = (s: string) =>
   norm(s)
     .split(/\s+/)
@@ -219,10 +262,15 @@ export function matchesCard(
     );
   if (!hasNumber) return false;
 
-  // EVERY significant word of the base name, not just one. "Jhin" alone let a
-  // listing for a different Jhin card through.
-  const base = significant(baseName(card.name));
-  if (base.length > 0 && !base.every((w) => t.includes(w))) return false;
+  // EVERY word of the base name, not just one. "Jhin" alone let a listing for a
+  // different Jhin card through.
+  //
+  // identifyingWords, not significant: a name made entirely of short words —
+  // "Old Rod", "Lux", "N" — left significant() empty, and `base.length > 0`
+  // then skipped this check altogether. The number was the only test those cards
+  // ever got, so Old Rod wore a photo of a Wooloo.
+  const base = identifyingWords(baseName(card.name));
+  if (base.length > 0 && !base.every((w) => containsWord(t, w))) return false;
 
   // And every variant qualifier must be accounted for. This is the important
   // one: the number identifies the CARD but not the PRINTING. Jhin - Virtuoso
