@@ -59,6 +59,11 @@ export default async function CardPage({
   if (!data?.card) notFound();
 
   const { card, history, siblings } = data;
+  // A booster box or ETB isn't a "card" — call it what it is. The noun feeds the
+  // page's wording (headings, empty states, the picture caption) so a sealed
+  // product never gets described as a single.
+  const sealed = !card.isSingle;
+  const noun = sealed ? "product" : "card";
   const game = isGameSlug(card.game) ? GAME_BY_SLUG[card.game] : null;
   const sources = cardImageSources({
     game: card.game,
@@ -96,6 +101,11 @@ export default async function CardPage({
         {card.language === "JP" && (
           <span className="rounded bg-panel-hi px-1.5 py-0.5 text-[10px]">JP</span>
         )}
+        {sealed && (
+          <span className="rounded bg-panel-hi px-1.5 py-0.5 text-[10px] font-medium text-ink-dim">
+            Sealed product
+          </span>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,300px)_1fr]">
@@ -113,7 +123,7 @@ export default async function CardPage({
           </div>
           {listingPhoto && (
             <p className="text-[11px] leading-snug text-ink-faint">
-              No official picture exists for this card, so this is a photo from a
+              No official picture exists for this {noun}, so this is a photo from a
               live eBay listing
               {card.ebayListingPrice != null ? ` (${money(card.ebayListingPrice)})` : ""}
               , taken by the seller.{" "}
@@ -188,14 +198,16 @@ export default async function CardPage({
               : "no history yet"}
           </span>
         </div>
-        <PriceChart series={series} />
+        <PriceChart series={series} sealed={sealed} />
       </section>
 
       {/* Card data */}
       {(prose.length > 0 || stats.length > 0) && (
         <section className="flex flex-col gap-3">
           <div className="border-b border-edge pb-2">
-            <h2 className="text-lg font-semibold">Card details</h2>
+            <h2 className="text-lg font-semibold">
+              {sealed ? "Product details" : "Card details"}
+            </h2>
           </div>
 
           {stats.length > 0 && (

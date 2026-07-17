@@ -93,7 +93,15 @@ const H = 300;
  * prefers-reduced-motion: no-preference, so a reader who's asked for less motion
  * gets the finished chart immediately rather than a degraded one.
  */
-export function PriceChart({ series: all }: { series: SeriesStats[] }) {
+export function PriceChart({
+  series: all,
+  sealed = false,
+}: {
+  series: SeriesStats[];
+  // A sealed product's condition caveat is about opened/damaged boxes, not
+  // card grades, so the band footnote and empty state read differently.
+  sealed?: boolean;
+}) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const uid = useId().replace(/:/g, "");
@@ -195,7 +203,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
   if (dates.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-10 text-center text-sm text-ink-faint">
-        No price history recorded for this card yet.
+        No price history recorded for this {sealed ? "product" : "card"} yet.
       </p>
     );
   }
@@ -336,8 +344,8 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
         {hasBand && (
           <span className="pt-0.5 text-[11px] leading-snug text-ink-faint">
             The cheapest copy isn&apos;t always a fair comparison — TCGplayer&apos;s
-            low price counts every condition, so the band&apos;s bottom edge can be a
-            damaged card.
+            low price counts every condition, so the band&apos;s bottom edge can be{" "}
+            {sealed ? "an opened or damaged copy" : "a damaged card"}.
           </span>
         )}
       </div>

@@ -180,9 +180,9 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
             </strong>{" "}
             The price sat at {money(catchUp.from)} for {catchUp.flatDaysBefore}{" "}
             days — market price only moves when a copy sells — then a sale landed
-            on {formatDate(catchUp.date)} at {money(catchUp.to)}. The card
-            didn&apos;t gain {percent(catchUp.pct!)} in a day; the number was out
-            of date and caught up all at once.
+            on {formatDate(catchUp.date)} at {money(catchUp.to)}. It didn&apos;t
+            gain {percent(catchUp.pct!)} in a day; the number was out of date and
+            caught up all at once.
           </div>
         </div>
       )}
