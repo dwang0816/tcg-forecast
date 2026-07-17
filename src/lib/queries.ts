@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { GameSlug, Language } from "./games";
 import { flatRunBefore, volatilityBefore, type PricePoint } from "./cardStats";
 import { moveScore, scoreCeiling, HISTORY_DAYS, type MoveScore } from "./conviction";
+import { identityOf } from "./printings";
 
 export type Direction = "gainers" | "losers";
 export type Kind = "single" | "sealed";
@@ -546,6 +547,68 @@ export async function getCardHistory(productId: number): Promise<HistoryPoint[]>
     ORDER BY date ASC, sub_type_name ASC
   `);
   return rowsOf<HistoryPoint>(res);
+}
+
+export interface SiblingPrinting {
+  productId: number;
+  name: string;
+  rarity: string | null;
+  number: string | null;
+  marketPrice: number | null;
+  imageUrl: string | null;
+  altImageUrls: string[] | null;
+  ebayPhotoUrl: string | null;
+}
+
+/**
+ * The other printings of the same card — alternate art, parallel, wanted
+ * poster, and the plain print. Matched exactly as ingest matches them when
+ * lending art (lib/ingest.ts): same set (group), same number, same leading
+ * identity. Returns the whole family INCLUDING the card asked about, priciest
+ * first, so the caller can lay out the set and mark the current one.
+ *
+ * A card with no number can't be grouped reliably, and one with no siblings
+ * returns just itself; callers should render nothing below a family of one.
+ */
+export async function getSiblingPrintings(card: {
+  productId: number;
+  name: string;
+  number: string | null;
+}): Promise<SiblingPrinting[]> {
+  if (!card.number) return [];
+  const db = getDb();
+  // Match on the base card's own game/group/number via a CTE keyed on its
+  // product_id — number is only unique within a set, so both must come from the
+  // same product, never from a passed-in value that could match another set.
+  const res = await db.execute(sql`
+    WITH base AS (
+      SELECT game, group_id, number FROM cards WHERE product_id = ${card.productId}
+    )
+    SELECT
+      c.product_id     AS "productId",
+      c.name           AS "name",
+      c.rarity         AS "rarity",
+      c.number         AS "number",
+      c.market_price   AS "marketPrice",
+      c.image_url      AS "imageUrl",
+      c.alt_image_urls AS "altImageUrls",
+      c.ebay_photo_url AS "ebayPhotoUrl"
+    FROM cards c, base b
+    WHERE c.game = b.game
+      AND c.group_id = b.group_id
+      AND c.number = b.number
+      AND c.is_single = true
+    ORDER BY c.market_price DESC NULLS LAST, c.product_id ASC
+  `);
+  // Numbers aren't reliably unique even within a set, so the identity has to
+  // agree too — the same filter ingest applies. Done here rather than in SQL
+  // because identityOf is the one definition of that rule.
+  const wanted = identityOf(card.name);
+  const rows = rowsOf<SiblingPrinting>(res).filter(
+    (r) => identityOf(r.name) === wanted,
+  );
+  // A family of one is just this card — nothing to show.
+  return rows.length > 1 ? rows : [];
 }
 
 export interface SearchResult extends ValuableRow {

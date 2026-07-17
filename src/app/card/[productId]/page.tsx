@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCard, getCardHistory } from "@/lib/queries";
+import { getCard, getCardHistory, getSiblingPrintings } from "@/lib/queries";
 import { GAME_BY_SLUG, isGameSlug } from "@/lib/games";
 import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
+import { SiblingPrintings } from "@/components/SiblingPrintings";
 import { PriceChart } from "@/components/PriceChart";
 import { CardPriceHeadline, CardPriceFacts } from "@/components/CardPriceStats";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
@@ -37,8 +38,15 @@ export default async function CardPage({
 
   const { data, error } = await safeLoad(async () => {
     const card = await getCard(productId);
-    if (!card) return { card: null, history: [] };
-    return { card, history: await getCardHistory(productId) };
+    if (!card) return { card: null, history: [], siblings: [] };
+    // Other printings are a One Piece feature for now — the grouping is
+    // game-agnostic, but whether it belongs on a Pokémon/Riftbound page is a
+    // separate call, so don't even query it off One Piece.
+    const [history, siblings] = await Promise.all([
+      getCardHistory(productId),
+      card.game === "onepiece" ? getSiblingPrintings(card) : Promise.resolve([]),
+    ]);
+    return { card, history, siblings };
   });
 
   if (error) {
@@ -50,7 +58,7 @@ export default async function CardPage({
   }
   if (!data?.card) notFound();
 
-  const { card, history } = data;
+  const { card, history, siblings } = data;
   const game = isGameSlug(card.game) ? GAME_BY_SLUG[card.game] : null;
   const sources = cardImageSources({
     game: card.game,
@@ -120,6 +128,14 @@ export default async function CardPage({
                 </a>
               )}
             </p>
+          )}
+
+          {siblings.length > 1 && (
+            <SiblingPrintings
+              printings={siblings}
+              currentId={card.productId}
+              game={card.game}
+            />
           )}
         </div>
 

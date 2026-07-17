@@ -11,6 +11,7 @@ import {
   mapPool,
 } from "./tcgcsv";
 import { isTracked, sanePrice } from "./tracking";
+import { identityOf } from "./printings";
 
 export interface IngestResult {
   game: string;
@@ -344,11 +345,9 @@ export async function ingestGame(
    * Only the leading identity, though — everything before the first "(", "[" or
    * " - ". That's what separates a variant from a different card: "Shuckle
    * (Mirror Holo)" is Shuckle wearing foil and should borrow, while Donphan is
-   * not Ampharos and must not.
+   * not Ampharos and must not. identityOf (lib/printings) is that rule, shared
+   * with the card page's sibling lookup so the two can't drift.
    */
-  const identityOf = (name: string): string =>
-    name.split(" (")[0].split(" [")[0].split(" - ")[0].trim();
-
   const keyOf = (c: NewCard): string | null => {
     if (c.number) return `n:${c.groupId}:${c.number}:${identityOf(c.name)}`;
     if (!c.isSingle) return `g:${c.groupId}`;
