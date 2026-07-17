@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 import { isAdmin, signIn, signOut } from "@/lib/admin";
+import { PRICES_TAG } from "@/lib/cached";
 
 /**
  * Every action re-checks isAdmin(). Server Actions are POST endpoints anyone can
@@ -68,6 +69,25 @@ export async function reject(productId: number) {
   `);
   revalidatePath("/admin/photos");
   revalidatePath(`/card/${productId}`);
+}
+
+/**
+ * Drop the cached reads so the site shows what's in the database right now.
+ *
+ * Browsing pages cache for a day and are normally refreshed by /api/ingest
+ * calling revalidateTag when it writes. But `pnpm run ingest` run from a laptop
+ * writes the same rows with no Next server anywhere in the picture, so nothing
+ * revalidates — the database moves and the site doesn't, silently, for up to a
+ * day. That's not theoretical: set codes were derived and correct in the database
+ * while every sealed tile kept rendering without them.
+ *
+ * Uses profile "max" for the same reason the ingest does: mark stale and serve
+ * the old page while the new one loads behind, rather than expiring instantly and
+ * making the next visitor wait on a multi-million-row scan.
+ */
+export async function refreshCache() {
+  if (!(await isAdmin())) throw new Error("Not signed in");
+  revalidateTag(PRICES_TAG, "max");
 }
 
 /** Undo the last call — misclicks happen when you're going quickly. */

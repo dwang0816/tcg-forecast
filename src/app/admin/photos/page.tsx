@@ -7,6 +7,7 @@ import { safeLoad } from "@/lib/safe";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { PasscodeForm } from "./PasscodeForm";
 import { ReviewGrid, type ReviewCard } from "./ReviewGrid";
+import { RefreshButton } from "./RefreshButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Photo review — TCG Forecast", robots: { index: false } };
@@ -121,10 +122,13 @@ export default async function AdminPhotosPage({
             Rejected <Count n={counts.bad} />
           </Tab>
         </div>
-        <p className="text-xs text-white/40">
-          {done} of {total} reviewed
-          {total > 0 && ` · ${Math.round((done / total) * 100)}%`}
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-xs text-white/40">
+            {done} of {total} reviewed
+            {total > 0 && ` · ${Math.round((done / total) * 100)}%`}
+          </p>
+          <RefreshButton />
+        </div>
       </div>
 
       {/* Progress, because "I can do this slowly" needs somewhere to come back to. */}
