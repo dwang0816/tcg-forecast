@@ -80,6 +80,13 @@ async function main() {
 
     // Stamp the timestamp either way: a miss is worth remembering so the next run
     // spends its quota on cards we haven't tried.
+    //
+    // A found photo also clears any old verdict. Without that, a card rejected
+    // months ago gets a brand new picture and keeps the 'bad' someone gave the
+    // last one — a human judgement attached to a photo no human has seen, on a
+    // card that can never come back to the queue to be judged, because the queue
+    // wants an unjudged verdict. A miss keeps its verdict: nothing changed for
+    // it, so there's nothing to re-judge.
     await db.execute(sql`
       UPDATE cards SET
         ebay_photo_url     = ${photo?.imageUrl ?? null},
@@ -87,6 +94,7 @@ async function main() {
         ebay_listing_title = ${photo?.title ?? null},
         ebay_listing_price = ${photo?.price ?? null},
         ebay_photo_at      = now()
+        ${photo ? sql`, photo_verdict = NULL, photo_reviewed_at = NULL` : sql``}
       WHERE product_id = ${c.product_id}
     `);
 
