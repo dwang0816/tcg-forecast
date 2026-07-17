@@ -249,7 +249,7 @@ export default async function GamePage({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight">
+        <h1 className="flex items-center gap-2.5 font-display text-xl font-bold tracking-tight sm:text-2xl">
           <span
             aria-hidden
             className={`h-2.5 w-2.5 shrink-0 rounded-full ${game.accent}`}

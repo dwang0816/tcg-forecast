@@ -40,7 +40,7 @@ export default async function SearchPage({
   };
 
   const chip = (active: boolean) =>
-    `rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+    `rounded-full px-3 py-2 text-xs font-medium transition-colors ${
       active ? "bg-white text-black" : "bg-panel text-ink-dim hover:bg-panel-hi hover:text-ink"
     }`;
 

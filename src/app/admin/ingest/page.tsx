@@ -134,8 +134,8 @@ export default async function AdminIngestPage() {
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-edge bg-panel">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-xl border border-edge bg-panel">
+          <table className="w-full min-w-[520px] text-left text-sm">
             <thead>
               <tr className="border-b border-edge text-ink-faint">
                 <Th>Catalog</Th>

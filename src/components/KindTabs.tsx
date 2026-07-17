@@ -30,7 +30,7 @@ export function KindTabs({
             key={t.key}
             href={makeHref(t.key)}
             aria-current={active ? "page" : undefined}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               active
                 ? "bg-panel-hi text-ink"
                 : "text-ink-faint hover:text-ink-dim"

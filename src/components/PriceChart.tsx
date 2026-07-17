@@ -268,7 +268,7 @@ export function PriceChart({
       `}</style>
 
       {choices.length > 1 && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {choices.map((r) => {
             const active = range === r.days;
             return (
@@ -279,7 +279,7 @@ export function PriceChart({
                   setHoverIdx(null); // indices are per-window; stale hover lies
                 }}
                 aria-pressed={active}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
+                className={`rounded-md px-2.5 py-1.5 text-xs font-medium tabular-nums transition-colors ${
                   active
                     ? "bg-panel-hi text-ink"
                     : "text-ink-faint hover:bg-panel hover:text-ink-dim"

@@ -13,7 +13,7 @@ export default function Loading() {
     <div className="flex flex-col gap-5" aria-busy>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="h-8 w-56 animate-pulse rounded bg-panel-hi" />
-        <div className="h-3 w-64 animate-pulse rounded bg-panel-hi" />
+        <div className="h-3 w-64 max-w-full animate-pulse rounded bg-panel-hi" />
       </div>
       {/* Kind tabs */}
       <div className="h-10 w-full animate-pulse rounded-xl bg-panel" />

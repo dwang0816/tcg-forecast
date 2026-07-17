@@ -110,3 +110,12 @@ body::before {
   text-transform: uppercase;
   color: var(--color-ink-faint);
 }
+
+/* For horizontally-scrollable chip rows (e.g. the game tabs on a very narrow
+   screen): keep the swipe, drop the scrollbar so it doesn't sit under the pills. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -58,8 +58,8 @@ export function TileGridSkeleton({ count = 10 }: { count?: number }) {
 export function MethodologySkeleton() {
   return (
     <div className="rounded-2xl border border-edge bg-panel p-5">
-      <Shimmer className="h-5 w-52" />
-      <Shimmer className="mt-2 h-3 w-72" />
+      <Shimmer className="h-5 w-52 max-w-full" />
+      <Shimmer className="mt-2 h-3 w-72 max-w-full" />
       <Shimmer className="mt-4 h-20 w-full rounded-xl" />
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Shimmer className="h-20 rounded-xl" />
@@ -72,7 +72,7 @@ export function MethodologySkeleton() {
 
 /** The "N products · data through … · N days tracked" line in the header. */
 export function StatsLineSkeleton() {
-  return <Shimmer className="h-3 w-64" />;
+  return <Shimmer className="h-3 w-64 max-w-full" />;
 }
 
 /** Whole-view fallback: methodology (movers views only) plus the grid. */

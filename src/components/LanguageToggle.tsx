@@ -28,7 +28,7 @@ export function LanguageToggle({
             key={o.key}
             href={makeHref(o.key)}
             aria-current={active ? "page" : undefined}
-            className={`rounded-full px-3.5 py-1.5 font-mono text-xs font-semibold transition-colors ${
+            className={`rounded-full px-3.5 py-2 font-mono text-xs font-semibold transition-colors ${
               active
                 ? "bg-gold text-graphite"
                 : "bg-panel text-ink-faint hover:bg-panel-hi hover:text-ink-dim"

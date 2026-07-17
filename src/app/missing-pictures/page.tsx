@@ -64,7 +64,7 @@ export default async function MissingPicturesPage({
 
       {/* Filters, matching the tab pattern used everywhere else on the site. */}
       <div className="flex flex-wrap items-center gap-4">
-        <nav className="flex gap-1 rounded-xl border border-edge bg-panel p-1">
+        <nav className="flex flex-wrap gap-1 rounded-xl border border-edge bg-panel p-1">
           <Tab href={href({ game: null })} active={!game}>
             All games
           </Tab>
@@ -74,7 +74,7 @@ export default async function MissingPicturesPage({
             </Tab>
           ))}
         </nav>
-        <nav className="flex gap-1 rounded-xl border border-edge bg-panel p-1">
+        <nav className="flex flex-wrap gap-1 rounded-xl border border-edge bg-panel p-1">
           <Tab href={href({ show: "tracked" })} active={tracked}>
             Tracked
           </Tab>
@@ -120,7 +120,7 @@ function Tab({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
         active
           ? "bg-panel-hi text-ink"
           : "text-ink-dim hover:bg-panel hover:text-ink"
@@ -219,7 +219,7 @@ async function Gaps({
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-edge">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-panel text-[11px] uppercase tracking-wide text-ink-faint">
                 <tr>
                   <th className="px-3 py-2.5 font-medium">Number</th>

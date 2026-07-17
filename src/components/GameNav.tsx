@@ -10,7 +10,7 @@ export function GameNav() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-edge bg-graphite/85 backdrop-blur">
-      <nav className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-3">
+      <nav className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-4 py-3">
         <Link href="/" className="mr-2 flex shrink-0 items-center gap-2.5">
           <Mark size={26} />
           <Wordmark className="text-base" />
@@ -18,8 +18,14 @@ export function GameNav() {
 
         {/* The accent dot rides in the tab itself: this is the only place the
             games appear side by side, so it's where the color coding has to be
-            learnable. */}
-        <div className="flex flex-1 items-center gap-1 overflow-x-auto">
+            learnable.
+
+            On a phone the games drop to their own full-width row (order-last +
+            w-full) rather than sharing the top row with the logo and search,
+            where three tabs plus both of those don't fit and the row turns into
+            a cramped internal scroll. Full width, they sit comfortably; the
+            scroll stays only as a fallback for very narrow screens, sans bar. */}
+        <div className="order-last flex w-full items-center gap-1 overflow-x-auto no-scrollbar md:order-none md:w-auto md:flex-1">
           {GAMES.map((game) => {
             const active = pathname === `/${game.slug}`;
             return (
@@ -27,7 +33,7 @@ export function GameNav() {
                 key={game.slug}
                 href={`/${game.slug}`}
                 aria-current={active ? "page" : undefined}
-                className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-panel-hi text-ink"
                     : "text-ink-faint hover:bg-panel hover:text-ink-dim"
@@ -51,7 +57,7 @@ export function GameNav() {
           <Link
             href="/missing-pictures"
             aria-current={pathname === "/missing-pictures" ? "page" : undefined}
-            className={`hidden rounded-full px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors md:inline ${
+            className={`hidden rounded-full px-3 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors md:inline ${
               pathname === "/missing-pictures"
                 ? "bg-panel-hi text-ink-dim"
                 : "text-ink-faint/70 hover:bg-panel hover:text-ink-faint"
@@ -66,7 +72,7 @@ export function GameNav() {
           <Link
             href="/search"
             aria-current={pathname === "/search" ? "page" : undefined}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
               pathname === "/search"
                 ? "border-gold/50 bg-gold/10 text-gold-bright"
                 : "border-edge text-ink-dim hover:border-gold/40 hover:bg-gold/[0.06] hover:text-gold-bright"
