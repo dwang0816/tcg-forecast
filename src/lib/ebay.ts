@@ -200,6 +200,67 @@ function baseName(name: string): string {
     .replace(/\b[\w]+\/[\w]+\b/g, " ");
 }
 
+/**
+ * Qualifiers that belong to a DIFFERENT printing of this same number.
+ *
+ * The qualifier check below proves our qualifiers are in the title. It never
+ * asked whether the title claims one we DON'T have, so "Irelia - Blade Dancer
+ * (Metal)" happily matched "Irelia - Blade Dancer (Metal) (Prize Wall)" — a
+ * different card, and a $3,500 one. Ezreal (Metal) at $1,549 wore the Prize
+ * Wall's photo, and Azir (Metal) wore it through five human approvals, because
+ * the two printings are the same artwork and the eye has nothing to catch.
+ *
+ * The rivals come from our own catalog rather than a hardcoded list, because a
+ * list would be a lie: 551 different qualifiers separate two cards that share a
+ * number, and the worst price gaps behind them are "alternate art" ($49,935),
+ * "wanted poster" ($49,334) and "sp" ($20,000). Prize Wall isn't even the top
+ * twenty. What we know for certain is what OUR OWN siblings are called, so that's
+ * what we check.
+ *
+ * Skips qualifiers under three characters and pure numbers — "sp" and "001" are
+ * too common in listing titles to reject on, and a false rejection costs a photo.
+ *
+ * Also skips a sibling qualifier that IS the card's number. One Piece names a
+ * printing "Roronoa Zoro (EB04-007)" and its sibling "Roronoa Zoro (SP)", so the
+ * number arrives here dressed as a qualifier — and every honest title for either
+ * card carries it, because it's the anchor we searched on. A card's own number
+ * can't be evidence against it.
+ */
+function rivalQualifiers(
+  name: string,
+  number: string | null,
+  siblingNames: string[] | null | undefined,
+): string[] {
+  if (!siblingNames?.length) return [];
+  const ours = new Set(qualifiers(name).map((q) => norm(q).trim()));
+  const num = number ? canonNumber(norm(number).trim()) : null;
+  const theirs = siblingNames.flatMap((n) => qualifiers(n)).map((q) => norm(q).trim());
+  return [
+    ...new Set(
+      theirs.filter(
+        (q) =>
+          q.length >= 3 &&
+          !/^\d+$/.test(q) &&
+          !ours.has(q) &&
+          (num === null || canonNumber(q) !== num),
+      ),
+    ),
+  ];
+}
+
+/**
+ * Is this phrase in the title as whole words?
+ *
+ * Substring matching here rejected a real photo: "Champions Festival ... World
+ * Championships 2019" was thrown out because a sibling is tagged [Champion] and
+ * "champion" is inside "championships". A rival qualifier is only evidence when
+ * the title actually says it.
+ */
+function hasPhrase(t: string, phrase: string): boolean {
+  const esc = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`).test(t);
+}
+
 /** The parenthesised/bracketed qualifiers: "(Metal)", "(Alternate Art)", "[Staff]". */
 function qualifiers(name: string): string[] {
   return [
@@ -230,6 +291,13 @@ export function matchesCard(
      * again, which is the safe direction to fail.
      */
     ambiguous?: boolean;
+    /**
+     * Names of the OTHER cards in our catalog carrying this same number — the
+     * rival printings. Their qualifiers are what a title must not claim. Callers
+     * compute this; omitting it silently disables the check, which is why every
+     * caller passes it.
+     */
+    siblingNames?: string[] | null;
   },
 ): boolean {
   if (!card.number) return false;
@@ -282,6 +350,14 @@ export function matchesCard(
     if (qw.length > 0 && !qw.some((w) => t.includes(w))) return false;
   }
 
+  // And the title must not claim a printing we are NOT. The check above only
+  // proves our qualifiers are present; a title carrying ours PLUS another card's
+  // still passed it, which is how the plain (Metal) cards ended up wearing the
+  // (Prize Wall) photo.
+  for (const q of rivalQualifiers(card.name, card.number, card.siblingNames)) {
+    if (hasPhrase(t, q)) return false;
+  }
+
   // And where it's needed, the SET has to be recognisable in the title.
   //
   // Card numbers are only unique within a set, and promos reuse the base set's
@@ -328,6 +404,8 @@ export interface CardQuery {
   game: string;
   /** See matchesCard(): does name+number identify one printing, or several? */
   ambiguous: boolean;
+  /** See matchesCard(): names of other cards sharing this number. */
+  siblingNames?: string[] | null;
   /**
    * Image URLs a human rejected in /admin/photos. Skipping these is what stops
    * a rerun rediscovering the same listing and quietly putting the same bad

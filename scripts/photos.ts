@@ -41,6 +41,11 @@ async function main() {
            (SELECT count(*) FROM cards o
              WHERE o.game = cards.game AND o.language = cards.language
                AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
+           -- The rival printings of this number. Their qualifiers are what a
+           -- title must not claim: (Metal) must not match (Metal) (Prize Wall).
+           (SELECT COALESCE(array_agg(o.name), '{}') FROM cards o
+             WHERE o.game = cards.game AND o.language = cards.language
+               AND o.number = cards.number AND o.product_id <> cards.product_id) AS sibling_names,
            rejected_photo_urls
     FROM cards
     WHERE tracked
@@ -61,6 +66,7 @@ async function main() {
     language: string;
     market_price: number | null;
     ambiguous: boolean;
+    sibling_names: string[] | null;
     rejected_photo_urls: string[] | null;
   }>(res);
 
@@ -75,6 +81,7 @@ async function main() {
       groupName: c.group_name,
       language: c.language,
       ambiguous: c.ambiguous,
+      siblingNames: c.sibling_names,
       rejectedPhotoUrls: c.rejected_photo_urls,
     });
 

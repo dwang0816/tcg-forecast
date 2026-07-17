@@ -141,6 +141,11 @@ export async function replacePhoto(productId: number): Promise<{
            (SELECT count(*) FROM cards o
              WHERE o.game = cards.game AND o.language = cards.language
                AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
+           -- The rival printings of this number. Their qualifiers are what a
+           -- title must not claim: (Metal) must not match (Metal) (Prize Wall).
+           (SELECT COALESCE(array_agg(o.name), '{}') FROM cards o
+             WHERE o.game = cards.game AND o.language = cards.language
+               AND o.number = cards.number AND o.product_id <> cards.product_id) AS sibling_names,
            ebay_photo_url, photo_review_count
     FROM cards WHERE product_id = ${productId}
   `);
@@ -151,6 +156,7 @@ export async function replacePhoto(productId: number): Promise<{
     number: string | null;
     language: string;
     ambiguous: boolean;
+    sibling_names: string[] | null;
     ebay_photo_url: string | null;
     photo_review_count: number;
   }>(res)[0];
@@ -164,6 +170,7 @@ export async function replacePhoto(productId: number): Promise<{
     groupName: c.group_name,
     language: c.language,
     ambiguous: c.ambiguous,
+    siblingNames: c.sibling_names,
   });
   if (all.length === 0) return null;
 
