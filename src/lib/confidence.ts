@@ -57,3 +57,18 @@ export const CONFIDENCE_LABEL: Record<ConfidenceTier, string> = {
   medium: "Moderate spread — price is somewhat unsettled",
   low: "Wide spread — little agreement on what this is worth",
 };
+
+/**
+ * The short name for a tier. This is the ONLY place the spread gets a word.
+ *
+ * It lived in ConfidenceBadge and got copied into the movers score, which put two
+ * vocabularies for one fact on the same tile: the badge called a 3.2x spread
+ * "confident" while the score called it "moderate spread", and "wide spread" meant
+ * factor 0.3 to the badge but 0.55 to the score. Same phrase, two meanings, side by
+ * side. Both read from here now, so they can't drift apart again.
+ */
+export const CONFIDENCE_TEXT: Record<ConfidenceTier, string> = {
+  high: "confident",
+  medium: "unsettled",
+  low: "wide spread",
+};

@@ -2,20 +2,21 @@ import {
   confidenceTier,
   spreadRatio,
   CONFIDENCE_LABEL,
+  CONFIDENCE_TEXT,
 } from "@/lib/confidence";
 
-// Not the value palette: gold means "worth money", and a mid-confidence badge
-// isn't making a claim about worth. This is the movement palette dimmed.
+// A traffic light: green agree, yellow unsettled, red nobody knows.
+//
+// The middle tier used to be grey, on the rule that gold is the value/premium colour
+// and a confidence badge makes no claim about worth (see globals.css). That rule was
+// already broken by the one component whose job is explaining this badge —
+// MethodologyNote paints the 55% and 65% confidence weights gold — so the badge was
+// the odd one out, and grey read as "no signal" rather than "middling signal".
+// Gold means "caution" here and in the note; it still never means "warning".
 const STYLES: Record<string, string> = {
   high: "bg-up/10 text-up",
-  medium: "bg-ink-faint/10 text-ink-dim",
+  medium: "bg-gold/10 text-gold-bright",
   low: "bg-down/10 text-down-bright",
-};
-
-const TEXT: Record<string, string> = {
-  high: "confident",
-  medium: "unsettled",
-  low: "wide spread",
 };
 
 /**
@@ -39,7 +40,7 @@ export function ConfidenceBadge({
       title={`${CONFIDENCE_LABEL[tier]} (low $${low} – high $${high}, ${ratio.toFixed(1)}x)`}
       className={`rounded px-1.5 py-0.5 font-mono text-[10px] tabular-nums ${STYLES[tier]}`}
     >
-      {TEXT[tier]} · {ratio.toFixed(1)}x
+      {CONFIDENCE_TEXT[tier]} · {ratio.toFixed(1)}x
     </span>
   );
 }

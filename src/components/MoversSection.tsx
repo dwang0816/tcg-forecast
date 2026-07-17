@@ -54,6 +54,8 @@ export function MoversSection({
               setCode={row.setCode}
               price={row.curPrice}
               change={{ pct: row.pctChange, abs: row.absChange }}
+              move={row.move}
+              windowDays={windowDays}
               lowPrice={row.lowPrice}
               highPrice={row.highPrice}
               gameSlug={row.game}

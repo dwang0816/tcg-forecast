@@ -1,11 +1,14 @@
 import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 import { GameSlug, Language } from "./games";
+import { flatRunBefore, volatilityBefore, type PricePoint } from "./cardStats";
+import { moveScore, scoreCeiling, HISTORY_DAYS, type MoveScore } from "./conviction";
 
 export type Direction = "gainers" | "losers";
 export type Kind = "single" | "sealed";
 
-export interface MoverRow {
+/** What stage 1 of getMovers selects, before the move is scored. */
+interface ShortlistRow {
   game: string;
   productId: number;
   name: string;
@@ -29,6 +32,14 @@ export interface MoverRow {
   /** Current listing spread — drives the confidence signal (see lib/confidence.ts). */
   lowPrice: number | null;
   highPrice: number | null;
+}
+
+export interface MoverRow extends ShortlistRow {
+  /**
+   * Why this card is where it is: the paced move, the conviction behind it, and the
+   * named dampers that got it there. `move.score` is what the list is ordered by.
+   */
+  move: MoveScore;
 }
 
 export interface ValuableRow {
@@ -65,17 +76,20 @@ function rowsOf<T>(res: unknown): T[] {
 }
 
 /**
- * Confidence multiplier from the listing spread. Must mirror confidenceFactor()
- * in lib/confidence.ts — that one drives the UI badge, this one drives ranking.
+ * How many rows stage 1 hands to stage 2 before the real ranking happens.
+ *
+ * Not a guess, and not a truncation: it's a provable superset. Pacing only ever
+ * shrinks |move| and every damper is <= 1, so a card's final |score| can never
+ * exceed scoreCeiling(|rawPct|) — which makes raw % a valid upper bound and a sort
+ * by raw % a valid shortlist. Anything cut here had a smaller raw move than all 400
+ * kept, so it could not have out-scored them however tight its spread.
+ *
+ * 400 measured against live Pokémon singles, the widest game: the 20th score lands
+ * around 28 while the 400th card's ceiling is far below it, so the true top 20 is
+ * comfortably inside. assertShortlistCovers() below re-checks that every call
+ * rather than trusting the measurement to hold as the data grows.
  */
-const SQL_CONFIDENCE = sql`
-  CASE
-    WHEN cur.low_price IS NULL OR cur.low_price <= 0 OR cur.high_price IS NULL THEN 0.5
-    WHEN cur.high_price / cur.low_price < 2  THEN 1.0
-    WHEN cur.high_price / cur.low_price < 4  THEN 0.8
-    WHEN cur.high_price / cur.low_price < 10 THEN 0.55
-    ELSE 0.3
-  END`;
+const SHORTLIST_SIZE = 400;
 
 /**
  * Top price movers over roughly `windowDays`.
@@ -106,6 +120,34 @@ const SQL_CONFIDENCE = sql`
  */
 const PREV_LOOKBACK_DAYS = 3;
 
+/**
+ * Guards the superset argument behind SHORTLIST_SIZE at runtime.
+ *
+ * The shortlist is only sound while the worst card kept can't out-score the 20th
+ * card returned. That held when measured, but the data grows daily and a quiet
+ * violation would silently drop real movers off the list — the failure mode would
+ * be an absence, which nobody notices. Cheap to check, so check it.
+ */
+function assertShortlistCovers(
+  /** Raw % of the weakest card stage 1 kept — the ceiling any cut card is under. */
+  worstKeptPct: number,
+  ranked: MoveScore[],
+  limit: number,
+  full: boolean,
+  windowDays: number,
+) {
+  // Nothing was cut unless stage 1 actually hit the limit, so nothing to prove.
+  if (!full || ranked.length < limit) return;
+  const cutoff = Math.abs(ranked[limit - 1].score);
+  const ceiling = scoreCeiling(worstKeptPct, windowDays);
+  if (ceiling > cutoff) {
+    console.warn(
+      `[getMovers] shortlist may be too narrow: a cut card could score up to ` +
+        `${ceiling.toFixed(1)} vs a #${limit} of ${cutoff.toFixed(1)}. Raise SHORTLIST_SIZE.`,
+    );
+  }
+}
+
 export async function getMovers({
   game,
   language,
@@ -129,6 +171,8 @@ export async function getMovers({
   const langFilter = language ? sql`AND c.language = ${language}` : sql``;
   const isSingle = kind === "single";
 
+  // Stage 1: shortlist by raw move. This is the old query, minus the ranking — the
+  // formula that used to live in that ORDER BY now lives only in lib/conviction.ts.
   const res = await db.execute(sql`
     WITH bounds AS (
       SELECT max(date) AS latest, min(date) AS earliest FROM price_snapshots
@@ -166,7 +210,6 @@ export async function getMovers({
       c.url             AS "url",
       c.rarity          AS "rarity",
       c.number          AS "number",
-    c.set_code        AS "setCode",
       c.set_code        AS "setCode",
       cur.sub_type_name AS "subTypeName",
       cur.market_price  AS "curPrice",
@@ -186,11 +229,78 @@ export async function getMovers({
       AND c.is_single = ${isSingle}
       ${gameFilter} ${langFilter}
     ORDER BY
-      ((cur.market_price - prev.market_price) / prev.market_price) * ${SQL_CONFIDENCE} ${order}
-    LIMIT ${limit}
+      ((cur.market_price - prev.market_price) / prev.market_price) ${order}
+    LIMIT ${SHORTLIST_SIZE}
   `);
 
-  return rowsOf<MoverRow>(res);
+  const shortlist = rowsOf<ShortlistRow>(res);
+  if (shortlist.length === 0) return [];
+
+  // Stage 2: history for the shortlist only — the two inputs SQL can't cheaply give
+  // us. Bounded by HISTORY_DAYS, which is why this is a fast query and not a scan of
+  // the 8.6M-row table: ~400 products x ~120 days.
+  const ids = [...new Set(shortlist.map((r) => r.productId))];
+  const hist = rowsOf<{
+    productId: number;
+    subTypeName: string;
+    date: string;
+    marketPrice: number | null;
+  }>(
+    await db.execute(sql`
+      SELECT ps.product_id AS "productId", ps.sub_type_name AS "subTypeName",
+             ps.date AS "date", ps.market_price AS "marketPrice"
+      FROM price_snapshots ps, (SELECT max(date) AS latest FROM price_snapshots) b
+      -- sql.param, not a bare \${ids}: drizzle expands an array in a template into a
+      -- tuple ($1, $2, ...), which ANY() rejects outright ("requires array on right
+      -- side"). param() binds it as one value so pg encodes a real int[].
+      WHERE ps.product_id = ANY(${sql.param(ids)}::int[])
+        AND ps.date >= (b.latest - make_interval(days => ${HISTORY_DAYS}))::date
+      ORDER BY ps.product_id, ps.sub_type_name, ps.date
+    `),
+  );
+
+  const seriesKey = (productId: number, subTypeName: string) => `${productId}|${subTypeName}`;
+  const byCard = new Map<string, PricePoint[]>();
+  for (const h of hist) {
+    const key = seriesKey(h.productId, h.subTypeName);
+    let pts = byCard.get(key);
+    if (!pts) byCard.set(key, (pts = []));
+    // Only `market` and `date` matter here; the rest of PricePoint is for the card
+    // page's chart, and filling it would mean carrying four more columns per row.
+    pts.push({ date: h.date, market: h.marketPrice, low: null, mid: null, high: null, directLow: null });
+  }
+
+  // Stage 3: the actual ranking, in one place, in TypeScript.
+  const scored = shortlist.map((row) => {
+    const points = byCard.get(seriesKey(row.productId, row.subTypeName)) ?? [];
+    return {
+      ...row,
+      move: moveScore({
+        windowDays,
+        rawPct: row.pctChange,
+        low: row.lowPrice,
+        high: row.highPrice,
+        flatDaysBefore: flatRunBefore(points, row.prevDate, row.prevPrice),
+        volatility: volatilityBefore(points, row.prevDate),
+      }),
+    };
+  });
+
+  // Gainers want the most positive score, losers the most negative — one signed key
+  // read from either end, exactly as the old ORDER BY did.
+  scored.sort((a, b) =>
+    direction === "gainers" ? b.move.score - a.move.score : a.move.score - b.move.score,
+  );
+
+  assertShortlistCovers(
+    shortlist[shortlist.length - 1].pctChange,
+    scored.map((s) => s.move),
+    limit,
+    shortlist.length === SHORTLIST_SIZE,
+    windowDays,
+  );
+
+  return scored.slice(0, limit);
 }
 
 /** Highest current market price. Works from the very first ingest. */

@@ -162,9 +162,7 @@ async function ViewContent({
                   );
                   const pick = (m: (typeof movers)[number]) => ({
                     name: m.name,
-                    pct: m.pctChange,
-                    low: m.lowPrice,
-                    high: m.highPrice,
+                    move: m.move,
                   });
                   return { top: pick(movers[0]), biggest: pick(biggest) };
                 })()

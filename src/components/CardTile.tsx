@@ -5,7 +5,9 @@ import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { MoveScoreBadge, PacedNote } from "@/components/MoveScoreBadge";
 import { GameTag } from "@/components/GameTag";
+import type { MoveScore } from "@/lib/conviction";
 
 export interface CardTileProps {
   productId: number;
@@ -21,6 +23,14 @@ export interface CardTileProps {
   setCode?: string | null;
   price: number;
   change?: { pct: number; abs: number } | null;
+  /**
+   * Why this card ranks where it does. Movers pass it; Most Valuable doesn't, since
+   * that list ranks by price and a move score would be answering a question nobody
+   * asked. Its presence is what swaps the confidence badge for the score badge.
+   */
+  move?: MoveScore | null;
+  /** The window `move` is scored against — the score is only readable next to it. */
+  windowDays?: number;
   /** Listing spread, for the confidence badge. */
   lowPrice?: number | null;
   highPrice?: number | null;
@@ -46,6 +56,8 @@ export function CardTile({
   setCode,
   price,
   change,
+  move,
+  windowDays,
   lowPrice,
   highPrice,
   priceType = "market",
@@ -94,11 +106,17 @@ export function CardTile({
           {name}
         </div>
         <CardIdentity number={number} setCode={setCode} rarity={rarity} groupName={groupName} />
-        {(lowPrice != null || highPrice != null) && (
-          <div className="mt-0.5">
+        {/* Both badges, and they don't overlap: the score badge answers "why is this
+            ranked here" (score, and how much of the move we believe), the confidence
+            badge answers "how settled is this price" and carries the actual spread
+            ratio. An earlier cut showed only the score with its weakest damper named,
+            which duplicated this badge on most tiles and dropped the ratio. */}
+        {(move && windowDays) || lowPrice != null || highPrice != null ? (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {move && windowDays && <MoveScoreBadge move={move} windowDays={windowDays} />}
             <ConfidenceBadge low={lowPrice ?? null} high={highPrice ?? null} />
           </div>
-        )}
+        ) : null}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <span className="flex flex-col">
@@ -133,9 +151,19 @@ export function CardTile({
               <span>
                 {up ? "▲" : "▼"} {percent(change.pct)}
               </span>
-              <span className="text-[10px] font-normal opacity-70">
-                {signedMoney(change.abs)}
-              </span>
+              {/* The raw % stays the headline — it's what actually happened, and
+                  hiding it would be its own lie. The second line is where the box
+                  has room for exactly one more number, so a paced card spends it on
+                  the correction rather than the dollar delta: when the headline
+                  percentage is misleading, saying so beats restating it in dollars.
+                  Cards with nothing to correct keep the dollar change. */}
+              {move && windowDays && move.paced ? (
+                <PacedNote move={move} windowDays={windowDays} />
+              ) : (
+                <span className="text-[10px] font-normal opacity-70">
+                  {signedMoney(change.abs)}
+                </span>
+              )}
             </span>
           )}
         </div>

@@ -21,7 +21,9 @@
   --color-ink-dim: oklch(0.72 0.01 260);
   --color-ink-faint: oklch(0.6 0.02 260);
 
-  /* Foil gold is the value/premium color. It never means "warning". */
+  /* Foil gold: the value/premium color, and the middle of the trust traffic light
+     (green agree / gold unsettled / red nobody knows) on confidence and conviction.
+     It still never means "warning" — nothing gold is telling you something broke. */
   --color-gold: oklch(0.8 0.13 85);
   --color-gold-bright: oklch(0.85 0.13 85);
   /* Price movement. Finance-native and card-condition native. */

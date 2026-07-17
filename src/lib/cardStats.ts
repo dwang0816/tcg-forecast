@@ -145,7 +145,7 @@ function lastMove(points: PricePoint[]): SeriesStats["lastMove"] {
 }
 
 /** Spread of day-over-day % moves — how jumpy this card is. */
-function volatility(points: PricePoint[]): number | null {
+export function volatility(points: PricePoint[]): number | null {
   const priced = points.filter((p) => p.market != null);
   const rets: number[] = [];
   for (let i = 1; i < priced.length; i++) {
@@ -157,6 +157,42 @@ function volatility(points: PricePoint[]): number | null {
   const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
   const varc = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length;
   return Math.sqrt(varc);
+}
+
+/**
+ * How jumpy this card was BEFORE `date` — its baseline behaviour, excluding a move
+ * you're about to judge.
+ *
+ * Ranking a move by a volatility that includes that same move is circular, and it
+ * misfires worst exactly where it matters: Charizard's 90 flat days plus one +240%
+ * lurch computes as wildly volatile, so the card gets punished for the very move
+ * pacing already corrected. Cut at the start of the window and those 90 days read
+ * volatility 0 — "usually steady", which is the honest description.
+ */
+export function volatilityBefore(points: PricePoint[], date: string): number | null {
+  return volatility(points.filter((p) => p.date <= date));
+}
+
+/**
+ * How long the price had been sitting at `price` as of `date`.
+ *
+ * The pacing input. Walks back from `date` while the market price is unchanged, so
+ * a card that just moved reads 0 and Charizard reads its whole frozen run. Returns
+ * null when `date` isn't in the series at all — the caller can't pace what it
+ * can't measure, and 0 would be a lie that reads as "fresh".
+ */
+export function flatRunBefore(
+  points: PricePoint[],
+  date: string,
+  price: number,
+): number | null {
+  const priced = points.filter((p) => p.market != null);
+  const at = priced.findIndex((p) => p.date === date);
+  if (at < 0) return null;
+  let start = at;
+  while (start > 0 && priced[start - 1].market === price) start--;
+  const ms = new Date(priced[at].date).getTime() - new Date(priced[start].date).getTime();
+  return Math.round(ms / 86_400_000);
 }
 
 export function seriesStats(label: string, points: PricePoint[]): SeriesStats {

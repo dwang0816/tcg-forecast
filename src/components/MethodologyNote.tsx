@@ -1,5 +1,6 @@
 import { money, percent, percentPlain } from "@/lib/format";
-import { confidenceFactor, spreadRatio } from "@/lib/confidence";
+import { convictionTier, type MoveScore } from "@/lib/conviction";
+import { CONVICTION_STYLES } from "@/components/MoveScoreBadge";
 
 export interface MoverExample {
   name: string;
@@ -17,10 +18,15 @@ export interface MoverExample {
  * small % can outrank a big one, but never said the ORDER is % x trust, so a
  * reader seeing +169% sitting below +118% could only conclude the ranking was
  * broken.
+ *
+ * These carry the real MoveScore rather than the ingredients to rebuild one. An
+ * earlier cut passed low/high and re-derived the ranking here with confidenceFactor,
+ * which made this file a third copy of the formula — and a copy that quietly went
+ * wrong the moment the score grew a term it didn't know about. Now it reports.
  */
 export interface RankExample {
-  top: { name: string; pct: number; low: number | null; high: number | null };
-  biggest: { name: string; pct: number; low: number | null; high: number | null };
+  top: { name: string; move: MoveScore };
+  biggest: { name: string; move: MoveScore };
 }
 
 /**
@@ -56,16 +62,12 @@ export function MethodologyNote({
   // i.e. the card on top isn't the one that moved most. On a day where they're the
   // same card there's nothing surprising to justify, and the box would be noise.
   const puzzle =
-    ranking && ranking.top.name !== ranking.biggest.name
-      ? {
-          top: ranking.top,
-          biggest: ranking.biggest,
-          topSpread: spreadRatio(ranking.top.low, ranking.top.high),
-          bigSpread: spreadRatio(ranking.biggest.low, ranking.biggest.high),
-          topFactor: confidenceFactor(ranking.top.low, ranking.top.high),
-          bigFactor: confidenceFactor(ranking.biggest.low, ranking.biggest.high),
-        }
-      : null;
+    ranking && ranking.top.name !== ranking.biggest.name ? ranking : null;
+
+  // Which of the two things cost the biggest mover its place — a stale price, or a
+  // price nobody agrees on? The old copy always said "spread", because spread was
+  // the only term that existed. Now it can be either, so ask rather than assert.
+  const lostToPacing = puzzle?.biggest.move.paced;
 
   return (
     <section className="rounded-2xl border border-edge bg-panel p-5">
@@ -118,8 +120,8 @@ export function MethodologyNote({
         </div>
       )}
 
-      {/* Three rules, one sentence each. */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {/* Four rules, one sentence each. */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Rule icon="💵" title="No sale, no number">
           If nobody bought a copy, there&apos;s no market price to compare — those
           cards sit under &ldquo;Unconfirmed&rdquo; rather than in these lists.
@@ -131,8 +133,15 @@ export function MethodologyNote({
           {money(minPrice)}.
         </Rule>
         <Rule icon="⚖️" title="Calm beats wild">
-          If sellers can&apos;t agree what a card is worth, we trust it less and
-          push it down. So a small % can sit above a big one.
+          If sellers can&apos;t agree what a card is worth, or it swings wildly every
+          week anyway, we trust the move less. So a small % can sit above a big one.
+        </Rule>
+        {/* The rule the old note was missing entirely, and the one that actually
+            decided the top of the list. Worth a tile of its own. */}
+        <Rule icon="🕰️" title="Old prices catch up">
+          A card that hasn&apos;t sold in months lurches the day someone finally buys
+          one. That&apos;s months of drift, not a {period}-day jump — so we spread it
+          over the time it really took.
         </Rule>
       </div>
 
@@ -146,47 +155,38 @@ export function MethodologyNote({
           </h4>
           <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
             <strong className="font-medium text-ink-dim">{puzzle.biggest.name}</strong>{" "}
-            moved {percentPlain(puzzle.biggest.pct)} — more than{" "}
+            moved {percentPlain(puzzle.biggest.move.rawPct)} — more than{" "}
             <strong className="font-medium text-ink-dim">{puzzle.top.name}</strong>{" "}
-            at {percentPlain(puzzle.top.pct)}. But {puzzle.top.name}{" "}
+            at {percentPlain(puzzle.top.move.rawPct)}. But {puzzle.top.name}{" "}
             is #1. Here&apos;s why:
           </p>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Compare
-              name={puzzle.top.name}
-              pct={puzzle.top.pct}
-              spread={puzzle.topSpread}
-              factor={puzzle.topFactor}
-              winner
-            />
-            <Compare
-              name={puzzle.biggest.name}
-              pct={puzzle.biggest.pct}
-              spread={puzzle.bigSpread}
-              factor={puzzle.bigFactor}
-            />
+            <Compare name={puzzle.top.name} move={puzzle.top.move} windowDays={period} winner />
+            <Compare name={puzzle.biggest.name} move={puzzle.biggest.move} windowDays={period} />
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            {puzzle.bigSpread != null && puzzle.topSpread != null ? (
+            {lostToPacing ? (
               <>
-                Sellers agree on {puzzle.top.name} — the dearest copy costs{" "}
-                {puzzle.topSpread.toFixed(1)}× the cheapest. On {puzzle.biggest.name}{" "}
-                they don&apos;t: {puzzle.bigSpread.toFixed(1)}×. When the price is
-                that unsettled, a big % is mostly noise, so we count only{" "}
-                {Math.round(puzzle.bigFactor * 100)}% of it.
+                {puzzle.biggest.name}&apos;s price hadn&apos;t budged in the{" "}
+                {puzzle.biggest.move.effectiveDays - period} days before this period
+                even started. When it finally sold, that whole stretch caught up at
+                once — so its {percentPlain(puzzle.biggest.move.rawPct)} took{" "}
+                {puzzle.biggest.move.effectiveDays} days to build up, not {period}.
+                Spread over the time it really covers, it&apos;s{" "}
+                {percentPlain(puzzle.biggest.move.pacedPct)}.
               </>
             ) : (
               <>
-                We know what sellers are asking for {puzzle.top.name}, and we
-                don&apos;t for {puzzle.biggest.name} — so we can&apos;t tell whether
-                that bigger move is real, and we count less of it.
+                {puzzle.biggest.move.weakest.detail} That makes a big % mostly noise,
+                so we count {Math.round(puzzle.biggest.move.conviction)}% of it —
+                against {Math.round(puzzle.top.move.conviction)}% for{" "}
+                {puzzle.top.name}.
               </>
             )}{" "}
             <strong className="font-medium text-ink-dim">
-              We order these lists by the change after that adjustment, not by the
-              raw %.
+              We order these lists by the score, not the raw %.
             </strong>{" "}
             A move you can trust beats a bigger one you can&apos;t.
           </p>
@@ -219,18 +219,42 @@ export function MethodologyNote({
               market price {period} days ago
             </code>
             <p className="mt-2">
-              We save every tracked card&apos;s market price once a day, and each
-              printing (Normal, Foil…) is counted separately — so a Foil copy never
-              gets compared against a Normal one.
+              That&apos;s the % on every tile — what the card actually did. We save
+              every tracked card&apos;s market price once a day, and each printing
+              (Normal, Foil…) is counted separately — so a Foil copy never gets
+              compared against a Normal one.
             </p>
           </div>
 
           <div>
             <p className="mb-2">
-              <strong className="text-ink-dim">&ldquo;Calm beats wild&rdquo;</strong>{" "}
-              means we compare the cheapest and priciest copy on sale. If those are
-              close, sellers agree and we trust the price. If the dearest is 10×
-              the cheapest, nobody really knows. We multiply the change by:
+              The <strong className="text-ink-dim">score</strong> on each tile is what
+              orders the list. It&apos;s the change, spread over the days it really
+              took, times how much of it we believe — squeezed onto a 0–99.9 scale so
+              the numbers stay comparable:
+            </p>
+            <code className="block overflow-x-auto whitespace-nowrap rounded-lg bg-graphite px-3 py-2 text-up-bright">
+              score ∝ paced change × conviction
+            </code>
+          </div>
+
+          <div>
+            <p className="mb-2">
+              <strong className="text-ink-dim">Paced change.</strong> A market price
+              only updates when someone buys a copy, so a card that rarely sells sits
+              frozen for weeks and then lurches. That lurch isn&apos;t a{" "}
+              {period}-day move — it&apos;s every day since the last sale arriving at
+              once. If the last sale was 90 days ago, we count the move as spread over
+              those 90 days, which is the honest rate. A card whose price is current
+              gets its full change, uncorrected.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2">
+              <strong className="text-ink-dim">Conviction</strong> is two things
+              multiplied. First, whether sellers agree — we compare the cheapest and
+              priciest copy on sale:
             </p>
             <table className="w-full max-w-xs text-left">
               <thead className="text-ink-faint">
@@ -244,6 +268,25 @@ export function MethodologyNote({
                 <tr><td className="py-0.5">2× – 4×</td><td className="text-up/70">80%</td></tr>
                 <tr><td className="py-0.5">4× – 10×</td><td className="text-gold/80">55%</td></tr>
                 <tr><td className="py-0.5">over 10×</td><td className="text-down/80">30%</td></tr>
+                <tr><td className="py-0.5">no copies listed</td><td className="text-gold/80">60%</td></tr>
+              </tbody>
+            </table>
+            <p className="mb-2 mt-3">
+              Second, whether a move this size is unusual <em>for this card</em>. We
+              look at how much it normally swings day to day, before this move:
+            </p>
+            <table className="w-full max-w-xs text-left">
+              <thead className="text-ink-faint">
+                <tr>
+                  <th className="py-0.5 font-medium">Normal daily swing</th>
+                  <th className="py-0.5 font-medium">Counts for</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                <tr><td className="py-0.5">under 2% — steady</td><td className="text-up/80">100%</td></tr>
+                <tr><td className="py-0.5">2% – 8% — moves a bit</td><td className="text-up/70">85%</td></tr>
+                <tr><td className="py-0.5">8% – 25% — jumpy</td><td className="text-gold/80">65%</td></tr>
+                <tr><td className="py-0.5">over 25% — erratic</td><td className="text-down/80">35%</td></tr>
               </tbody>
             </table>
           </div>
@@ -272,18 +315,23 @@ export function MethodologyNote({
   );
 }
 
-/** One side of the "why isn't the biggest at the top" comparison. */
+/**
+ * One side of the "why isn't the biggest at the top" comparison.
+ *
+ * Walks the same path the score does, in order: what it moved, how long that really
+ * took, how much of it we believe, what that scores. A reader who follows the four
+ * lines has followed the formula — which is the point, since the two cards side by
+ * side are the only place the ordering ever gets to prove itself.
+ */
 function Compare({
   name,
-  pct,
-  spread,
-  factor,
+  move,
+  windowDays,
   winner,
 }: {
   name: string;
-  pct: number;
-  spread: number | null;
-  factor: number;
+  move: MoveScore;
+  windowDays: number;
   winner?: boolean;
 }) {
   return (
@@ -300,36 +348,42 @@ function Compare({
           </span>
         )}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[11px] text-ink-faint">
+
+      <div className="mt-1.5 flex flex-col gap-1 text-[11px] text-ink-faint">
         <span>
           moved{" "}
           <strong className="font-medium tabular-nums text-ink-dim">
-            {percentPlain(pct)}
+            {percentPlain(move.rawPct)}
           </strong>
-        </span>
-        <span aria-hidden className="text-ink-faint/40">
-          ·
+          {move.paced && (
+            <>
+              {" "}
+              over{" "}
+              <strong className="font-medium tabular-nums text-ink-dim">
+                {move.effectiveDays} days
+              </strong>
+              , so{" "}
+              <strong className="font-medium tabular-nums text-ink-dim">
+                {percentPlain(move.pacedPct)}
+              </strong>{" "}
+              per {windowDays} days
+            </>
+          )}
         </span>
         <span>
-          sellers{" "}
-          <strong className="font-medium tabular-nums text-ink-dim">
-            {spread != null ? `${spread.toFixed(1)}×` : "unknown"}
+          {move.weakest.label} — we believe{" "}
+          <strong className={`font-semibold tabular-nums ${CONVICTION_STYLES[convictionTier(move.conviction)]}`}>
+            {Math.round(move.conviction)}%
           </strong>{" "}
-          apart
+          of it
         </span>
       </div>
-      <div className="mt-1.5 text-[11px] text-ink-faint">
-        counts for{" "}
-        <strong
-          className={`font-semibold tabular-nums ${
-            factor >= 0.8 ? "text-up-bright" : factor >= 0.55 ? "text-gold" : "text-down-bright"
-          }`}
-        >
-          {Math.round(factor * 100)}%
-        </strong>{" "}
-        <span className="tabular-nums text-ink-faint/70">
-          → {percentPlain(pct * factor)}
-        </span>
+
+      <div className="mt-1.5 border-t border-edge pt-1.5 text-[11px] text-ink-faint">
+        score{" "}
+        <strong className="font-mono font-semibold tabular-nums text-ink-dim">
+          {Math.abs(move.score).toFixed(1)}
+        </strong>
       </div>
     </div>
   );
