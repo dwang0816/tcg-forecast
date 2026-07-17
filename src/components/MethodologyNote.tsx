@@ -94,7 +94,10 @@ export function MethodologyNote({
           <div className="flex flex-wrap items-center gap-3">
             <Stat label={fromDate ?? `${period} days ago`} value={money(example.from)} />
             <span className="text-lg text-ink-faint/60">→</span>
-            <Stat label={toDate ?? "today"} value={money(example.to)} />
+            {/* Today's price wears the direction, matching the tiles below. The
+                one it came from doesn't: a past price isn't going anywhere, and
+                coloring both would say this card moved twice. */}
+            <Stat label={toDate ?? "today"} value={money(example.to)} up={up} />
             <span className="text-lg text-ink-faint/60">=</span>
             <span
               className={`rounded-lg px-3 py-2 font-mono text-lg font-semibold tabular-nums ${
@@ -332,11 +335,24 @@ function Compare({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  up,
+}: {
+  label: string;
+  value: string;
+  /** Direction this price moved. Omitted for a price that isn't moving. */
+  up?: boolean;
+}) {
   return (
     <span className="flex flex-col">
       <span className="text-[11px] text-ink-faint">{label}</span>
-      <span className="font-mono text-lg font-semibold tabular-nums text-gold-bright">
+      <span
+        className={`font-mono text-lg font-semibold tabular-nums ${
+          up == null ? "text-gold-bright" : up ? "text-up-bright" : "text-down-bright"
+        }`}
+      >
         {value}
       </span>
     </span>
