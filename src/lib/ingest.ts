@@ -335,11 +335,22 @@ export async function ingestGame(
    * Mewtwo LV.X Collection Pack). 2,543 cards were doing this. A confidently
    * wrong picture is worse than no picture: nobody can tell it's wrong.
    *
-   * Same set + same number is the real sibling relationship — the separate
-   * product entries TCGplayer creates for one card's variants.
+   * Same set + same number is *nearly* the sibling relationship — the separate
+   * product entries TCGplayer creates for one card's variants. Nearly, because
+   * a set's numbers aren't reliably unique either: L1: HeartGold Collection has
+   * both Ampharos and Donphan at 034/070, and S-P: Sword & Shield Promos gives
+   * all seven of its cards the number "S-P". So the name has to agree too.
+   *
+   * Only the leading identity, though — everything before the first "(", "[" or
+   * " - ". That's what separates a variant from a different card: "Shuckle
+   * (Mirror Holo)" is Shuckle wearing foil and should borrow, while Donphan is
+   * not Ampharos and must not.
    */
+  const identityOf = (name: string): string =>
+    name.split(" (")[0].split(" [")[0].split(" - ")[0].trim();
+
   const keyOf = (c: NewCard): string | null => {
-    if (c.number) return `n:${c.groupId}:${c.number}`;
+    if (c.number) return `n:${c.groupId}:${c.number}:${identityOf(c.name)}`;
     if (!c.isSingle) return `g:${c.groupId}`;
     return null; // single without a number: nothing reliable to borrow
   };
