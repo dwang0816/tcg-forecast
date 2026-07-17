@@ -245,6 +245,7 @@ export async function getMostValuable({
         c.url            AS "url",
         c.rarity         AS "rarity",
         c.number         AS "number",
+        c.set_code       AS "setCode",
         ps.sub_type_name AS "subTypeName",
         ps.market_price  AS "marketPrice",
         ps.low_price     AS "lowPrice",
