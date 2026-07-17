@@ -9,6 +9,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { CardPriceHeadline, CardPriceFacts } from "@/components/CardPriceStats";
 import { DbErrorBanner } from "@/components/DbErrorBanner";
 import { statsByPrinting } from "@/lib/cardStats";
+import { msrpFor, typePhrase, msrpComparison } from "@/lib/msrp";
 import { formatDate, money } from "@/lib/format";
 import { safeLoad } from "@/lib/safe";
 
@@ -83,6 +84,23 @@ export default async function CardPage({
   // the signal on a thin card, and the asking band still has something to say.
   const series = statsByPrinting(history);
   const primary = series[0] ?? null;
+
+  // Sealed products get an MSRP reference next to the price. Only when we can
+  // quote one honestly (see lib/msrp): a standard format, a curated game, dated
+  // to the current era by its earliest snapshot, and consistent with that
+  // retail floor. `currentMarket` is the latest day that actually has a sale.
+  const currentMarket =
+    primary?.points.filter((p) => p.market != null).at(-1)?.market ?? null;
+  const msrp =
+    sealed && primary
+      ? msrpFor({
+          game: card.game,
+          name: card.name,
+          language: card.language,
+          earliest: history[0]?.date ?? null,
+          allTimeLow: primary.low?.price ?? null,
+        })
+      : null;
 
   const extended = (card.extended ?? []).filter((f) => f.value?.trim());
   const prose = extended.filter((f) => PROSE_FIELDS.has(f.name));
@@ -169,6 +187,26 @@ export default async function CardPage({
               We haven&apos;t recorded a price for this one yet. It&apos;ll appear
               after the next daily update.
             </p>
+          )}
+
+          {msrp && currentMarket != null && (
+            <div className="rounded-xl border border-edge bg-panel/50 px-4 py-3">
+              <div className="text-[11px] uppercase tracking-wide text-ink-faint">
+                Reference · typical retail
+              </div>
+              <div className="mt-0.5 flex items-baseline gap-2">
+                <span className="text-lg font-semibold tabular-nums text-ink">
+                  {money(msrp.msrp)}
+                </span>
+                <span className="text-xs font-medium text-ink-dim">
+                  {msrpComparison(currentMarket, msrp.msrp)}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] leading-snug text-ink-faint">
+                Roughly what {typePhrase(msrp.type)} of this era cost at retail —
+                an anchor for comparison, not a recorded sale.
+              </div>
+            </div>
           )}
 
           {card.url && (
