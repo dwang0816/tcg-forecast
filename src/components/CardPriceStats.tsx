@@ -50,7 +50,9 @@ function RangeBar({ s }: { s: SeriesStats }) {
       <div className="mb-2 text-sm font-medium text-ink-dim">
         Where today&apos;s price sits {spanWords(s)}
       </div>
-      <div className="relative mt-1.5 h-1.5 rounded-full bg-gradient-to-r from-down/30 via-ink-faint/20 to-up/35">
+      {/* mt-7 reserves a row for the "today" label, which is lifted -top-6 above
+          the bar — too little clearance here and it rides up into the heading. */}
+      <div className="relative mt-7 h-1.5 rounded-full bg-gradient-to-r from-down/30 via-ink-faint/20 to-up/35">
         {/* The tick is the whole point of the bar, so it says what it is. */}
         <div
           className="absolute -top-1 h-3.5 w-1 -translate-x-1/2 rounded-full bg-gold shadow-[0_0_8px_rgba(228,183,80,0.7)]"
