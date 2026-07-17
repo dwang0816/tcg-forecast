@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { submitPasscode } from "./actions";
+import { Mark } from "@/components/Logo";
 
 export function PasscodeForm() {
   const [error, action, pending] = useActionState(submitPasscode, null);
@@ -9,9 +10,13 @@ export function PasscodeForm() {
   return (
     <form
       action={action}
-      className="flex max-w-sm flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-5"
+      className="flex max-w-sm flex-col gap-3 rounded-xl border border-edge bg-panel p-5"
     >
-      <label htmlFor="passcode" className="text-sm font-medium text-white/70">
+      <Mark size={28} className="mb-1" />
+      <label
+        htmlFor="passcode"
+        className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-faint"
+      >
         Passcode
       </label>
       <input
@@ -20,13 +25,13 @@ export function PasscodeForm() {
         type="password"
         autoComplete="current-password"
         autoFocus
-        className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/35"
+        className="rounded-lg border border-edge bg-graphite px-3 py-2 font-mono text-sm text-ink outline-none transition-colors focus:border-gold/50"
       />
-      {error && <p className="text-xs text-rose-400">{error}</p>}
+      {error && <p className="font-mono text-xs text-down-bright">{error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg border border-white/20 bg-white/[0.08] py-2 text-sm font-medium text-white/85 transition-colors hover:bg-white/15 disabled:opacity-50"
+        className="rounded-lg border border-gold/40 bg-gold/10 py-2 text-sm font-semibold text-gold-bright transition-colors hover:bg-gold/20 disabled:opacity-50"
       >
         {pending ? "Checking…" : "Unlock"}
       </button>

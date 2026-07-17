@@ -26,13 +26,13 @@ export function RefreshButton() {
           })
         }
         disabled={pending}
-        className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+        className="rounded-lg border border-edge px-3 py-1.5 text-xs font-medium text-ink-dim transition-colors hover:border-gold/40 hover:bg-gold/[0.06] hover:text-gold-bright disabled:opacity-50"
         title="Show what's in the database now, instead of waiting for the cache to expire"
       >
         {pending ? "Refreshing…" : "Refresh site data"}
       </button>
       {done && (
-        <span className="text-xs text-emerald-400">
+        <span className="font-mono text-xs text-up-bright">
           Done — pages will show fresh data.
         </span>
       )}
