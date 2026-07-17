@@ -83,6 +83,22 @@ export default async function AdminPhotosPage({
           : sql`photo_verdict = 'bad'`;
     const gameFilter = game === "all" ? sql`TRUE` : sql`game = ${game}`;
 
+    // An unattended run found this and nobody has called it yet.
+    //
+    // photo_found_at, not ebay_photo_at: the reroll asks eBay too, and a picture
+    // you chose yourself is not an arrival.
+    //
+    // COALESCE is load-bearing. photo_found_at is NULL on every card a run hasn't
+    // touched, and NULL > x is NULL rather than false — so without it this is NULL
+    // for most of the table, and ORDER BY ... DESC puts NULLs FIRST, ahead of
+    // true. The unmarked cards outranked the new ones and the flame sorted last.
+    //
+    // Written once and spliced into both the SELECT and the ORDER BY, because an
+    // output alias can only be used BARE in ORDER BY: `ORDER BY "isNew"` is legal,
+    // `CASE WHEN "isNew" ...` is `column "isNew" does not exist`.
+    const isNew = sql`(photo_verdict IS NULL
+      AND COALESCE(photo_found_at > now() - ${NEW_FOR}::interval, false))`;
+
     // Three tiers, in this order:
     //   1. Just arrived and never judged — the flame. Newest photo first, so a
     //      fresh batch is the first thing you see when you come back.
@@ -93,9 +109,9 @@ export default async function AdminPhotosPage({
     const order =
       show === "todo"
         ? sql`
-            "isNew" DESC,
+            ${isNew} DESC,
             (photo_verdict IS NOT NULL),
-            CASE WHEN "isNew" THEN photo_found_at END DESC NULLS LAST,
+            CASE WHEN ${isNew} THEN photo_found_at END DESC NULLS LAST,
             photo_reviewed_at ASC NULLS FIRST,
             COALESCE(market_price, listing_price) DESC NULLS LAST,
             name`
@@ -109,18 +125,7 @@ export default async function AdminPhotosPage({
                ebay_listing_price AS "listingPrice",
                photo_review_count AS "reviewCount",
                photo_verdict AS "verdict",
-               -- An unattended run found this and nobody has called it yet.
-               -- photo_found_at, not ebay_photo_at: the reroll asks eBay too, and
-               -- a picture you chose yourself is not an arrival.
-               --
-               -- COALESCE is load-bearing. photo_found_at is NULL on every card a
-               -- run hasn't touched, and NULL > x is NULL, not false — so this
-               -- returned NULL for most of the table, and ORDER BY ... DESC puts
-               -- NULLs FIRST. The unmarked cards sorted above the new ones and
-               -- the flame landed at the bottom of the queue.
-               (photo_verdict IS NULL
-                 AND COALESCE(photo_found_at > now() - ${NEW_FOR}::interval, false)
-               ) AS "isNew",
+               ${isNew} AS "isNew",
                COALESCE(market_price, listing_price) AS "value"
         FROM cards
         WHERE ${filter} AND ${gameFilter}
