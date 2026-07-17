@@ -268,6 +268,30 @@ export async function ingestGame(
   const codeOf = (n: string | null | undefined) =>
     n?.match(/^([A-Za-z]{2,4}\d{2})-/)?.[1]?.toUpperCase() ?? null;
 
+  /**
+   * Second source: the code Pokémon puts in the set's NAME.
+   *
+   * One Piece hides the code in its card numbers (OP05-060), but Pokémon doesn't
+   * — its numbers are "105/112", carrying nothing. It puts the code in the group
+   * name instead: "SWSH11: Lost Origin", "SV8a: Terastal Fest ex", "L1: HeartGold
+   * Collection".
+   *
+   * The digit requirement is what separates a set from a series. "SWSH11" names a
+   * set; "SWSH" (Crown Zenith) and "SM" (Guardians Rising) are series spanning
+   * dozens of sets, so showing them would tell a buyer nothing while taking up the
+   * same room. Also rejects "Arceus LV.X Deck: Grass & Fire", where the colon is
+   * just punctuation.
+   *
+   * Riftbound gets nothing from either source — "Origins", "Spiritforged" and
+   * "181/219" contain no code, because Riftbound doesn't publish one. Null is the
+   * honest answer rather than a made-up label.
+   */
+  const codeFromGroupName = (name: string): string | null => {
+    const m = name.match(/^([A-Za-z][A-Za-z0-9-]{0,7})(?::| - )/);
+    if (!m) return null;
+    return /\d/.test(m[1]) ? m[1] : null;
+  };
+
   const codeTally = new Map<number, Map<string, number>>();
   for (const c of cardRows) {
     if (!c.isSingle) continue;
@@ -293,8 +317,12 @@ export async function ingestGame(
       setCodeByGroup.set(groupId, best);
     }
   }
+  // Numbers first, group name second. Where a set's own cards state the code
+  // (One Piece), that's the primary evidence; the name is the fallback for games
+  // whose numbers carry nothing (Pokémon). Both can be absent — Riftbound has no
+  // code to find, and null says so honestly.
   for (const c of cardRows) {
-    c.setCode = setCodeByGroup.get(c.groupId) ?? null;
+    c.setCode = setCodeByGroup.get(c.groupId) ?? codeFromGroupName(c.groupName) ?? null;
   }
 
   /**
