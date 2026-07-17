@@ -186,7 +186,11 @@ export async function replacePhoto(productId: number): Promise<{
       ebay_photo_at      = now(),
       -- A new photo is unjudged, whatever the old one's verdict was.
       photo_verdict      = NULL,
-      photo_reviewed_at  = NULL
+      photo_reviewed_at  = NULL,
+      -- You picked this one, so it isn't news to you. Without this, cycling
+      -- through a card's listings would stamp every one of them as a fresh
+      -- arrival and the flame would stop meaning anything.
+      photo_found_at     = NULL
       -- photo_review_count deliberately untouched: the tally counts VERDICTS,
       -- and asking to see a different picture isn't one. Counting rerolls made
       -- the number say "how many photos went past" when what it has to say is

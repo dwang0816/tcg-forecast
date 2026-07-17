@@ -16,6 +16,17 @@ export const metadata = { title: "Photo review — TCG Forecast", robots: { inde
 const PAGE = 24;
 
 /**
+ * How long a just-arrived photo counts as new.
+ *
+ * Three days, not one: the photo job's finds should still be wearing the flame
+ * when you sit down after a weekend, and a missed run shouldn't quietly age a
+ * batch out of being noticed. It only affects the flame and the jump to the top
+ * — nothing expires, and an un-flamed card is still unjudged and still near the
+ * front.
+ */
+const NEW_FOR = "72 hours";
+
+/**
  * Human review of the eBay listing photos.
  *
  * The matcher can only judge whether a listing's TITLE is plausible. Whether the
@@ -72,14 +83,19 @@ export default async function AdminPhotosPage({
           : sql`photo_verdict = 'bad'`;
     const gameFilter = game === "all" ? sql`TRUE` : sql`game = ${game}`;
 
-    // Never-judged first, most valuable of those first. Then the judged ones,
-    // oldest verdict first — the longer ago you called a card, the sooner it
-    // comes back round. Judge something and it lands at the very back, because
-    // its verdict is now the newest one there is.
+    // Three tiers, in this order:
+    //   1. Just arrived and never judged — the flame. Newest photo first, so a
+    //      fresh batch is the first thing you see when you come back.
+    //   2. Everything else never judged, most valuable first.
+    //   3. Judged, oldest verdict first — the longer ago you called a card, the
+    //      sooner it comes round. Judge something and it lands at the very back,
+    //      because its verdict is now the newest one there is.
     const order =
       show === "todo"
         ? sql`
+            "isNew" DESC,
             (photo_verdict IS NOT NULL),
+            CASE WHEN "isNew" THEN photo_found_at END DESC NULLS LAST,
             photo_reviewed_at ASC NULLS FIRST,
             COALESCE(market_price, listing_price) DESC NULLS LAST,
             name`
@@ -93,6 +109,18 @@ export default async function AdminPhotosPage({
                ebay_listing_price AS "listingPrice",
                photo_review_count AS "reviewCount",
                photo_verdict AS "verdict",
+               -- An unattended run found this and nobody has called it yet.
+               -- photo_found_at, not ebay_photo_at: the reroll asks eBay too, and
+               -- a picture you chose yourself is not an arrival.
+               --
+               -- COALESCE is load-bearing. photo_found_at is NULL on every card a
+               -- run hasn't touched, and NULL > x is NULL, not false — so this
+               -- returned NULL for most of the table, and ORDER BY ... DESC puts
+               -- NULLs FIRST. The unmarked cards sorted above the new ones and
+               -- the flame landed at the bottom of the queue.
+               (photo_verdict IS NULL
+                 AND COALESCE(photo_found_at > now() - ${NEW_FOR}::interval, false)
+               ) AS "isNew",
                COALESCE(market_price, listing_price) AS "value"
         FROM cards
         WHERE ${filter} AND ${gameFilter}
@@ -111,7 +139,12 @@ export default async function AdminPhotosPage({
           -- card, and a card with no photo has nothing to judge, so it isn't in
           -- the rotation. Deriving the badge from the verdict counts claimed a
           -- Riftbound queue of 10 while showing 6.
-          count(*) FILTER (WHERE ebay_photo_url IS NOT NULL)::int AS queue
+          count(*) FILTER (WHERE ebay_photo_url IS NOT NULL)::int AS queue,
+          count(*) FILTER (
+            WHERE ebay_photo_url IS NOT NULL
+              AND photo_verdict IS NULL
+              AND photo_found_at > now() - ${NEW_FOR}::interval
+          )::int AS fresh
         FROM cards
         GROUP BY game
       `),
@@ -124,6 +157,7 @@ export default async function AdminPhotosPage({
         good: number;
         bad: number;
         queue: number;
+        fresh: number;
       }>(counts),
     };
   });
@@ -146,8 +180,9 @@ export default async function AdminPhotosPage({
       good: a.good + r.good,
       bad: a.bad + r.bad,
       queue: a.queue + r.queue,
+      fresh: a.fresh + r.fresh,
     }),
-    { todo: 0, good: 0, bad: 0, queue: 0 },
+    { todo: 0, good: 0, bad: 0, queue: 0, fresh: 0 },
   );
   // Progress is over the rotation — the cards you can actually be asked about.
   const total = counts.queue;

@@ -19,6 +19,8 @@ export interface ReviewCard {
   reviewCount: number;
   /** What it's currently called, if anything. Re-judging overwrites it. */
   verdict: "good" | "bad" | null;
+  /** Photo arrived on a recent photo run and nobody has called it yet. */
+  isNew: boolean;
   value: number | null;
   valueLabel: string | null;
   priceLabel: string | null;
@@ -60,6 +62,24 @@ function ReviewCount({ n }: { n: number }) {
       }`}
     >
       reviewed ×{n}
+    </span>
+  );
+}
+
+/**
+ * Just in from a photo run, never called.
+ *
+ * These sort to the very top of the queue, so the flame is confirmation rather
+ * than a hunt: the new arrivals are the first thing on screen, and this says
+ * why they jumped the line.
+ */
+function NewFlag() {
+  return (
+    <span
+      title="New photo from the latest run — nobody has judged this one yet, so it's first in the queue"
+      className="shrink-0 rounded border border-gold/50 bg-gold/[0.16] px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-gold-bright"
+    >
+      <span aria-hidden>🔥</span> new
     </span>
   );
 }
@@ -284,6 +304,7 @@ export function ReviewGrid({
                     {c.number ?? "—"}
                     {c.rarity ? ` · ${c.rarity}` : ""}
                   </span>
+                  {c.isNew && <NewFlag />}
                   <ReviewCount n={c.reviewCount} />
                   {c.verdict && <CurrentVerdict v={c.verdict} />}
                 </div>

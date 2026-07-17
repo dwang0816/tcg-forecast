@@ -88,6 +88,17 @@ ALTER TABLE cards ADD COLUMN IF NOT EXISTS rejected_photo_urls text[];
 -- A card at 4 has been looked at and called four separate times.
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_review_count int NOT NULL DEFAULT 0;
 
+-- When an UNATTENDED photo run put the current picture here. This is what makes
+-- a card "new" in the review queue: a photo nobody has laid eyes on yet, which
+-- jumps to the front wearing a flame.
+--
+-- Deliberately not ebay_photo_at. That one means "when we last asked eBay", and
+-- the reroll asks — so a human flicking through listings would stamp it and every
+-- card they browsed would light up as new. Nobody needs to be told about a photo
+-- they just chose. The reroll clears this instead: a human-picked picture has by
+-- definition been seen.
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS photo_found_at timestamp;
+
 -- The set's own code — OP05, EB01, ST26 — derived at ingest from the numbers of
 -- the singles in the set (see lib/ingest.ts).
 --

@@ -94,7 +94,15 @@ async function main() {
         ebay_listing_title = ${photo?.title ?? null},
         ebay_listing_price = ${photo?.price ?? null},
         ebay_photo_at      = now()
-        ${photo ? sql`, photo_verdict = NULL, photo_reviewed_at = NULL` : sql``}
+        ${
+          photo
+            ? // Nobody has seen this one: it goes to the front of the queue with
+              // a flame on it. photo_found_at is set HERE and only here — this is
+              // the unattended path, and "new" means a picture that arrived while
+              // you weren't looking.
+              sql`, photo_verdict = NULL, photo_reviewed_at = NULL, photo_found_at = now()`
+            : sql``
+        }
       WHERE product_id = ${c.product_id}
     `);
 

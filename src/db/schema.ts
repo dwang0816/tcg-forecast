@@ -92,6 +92,12 @@ export const cards = pgTable(
      * running review history, not a measure of eBay's supply.
      */
     photoReviewCount: integer("photo_review_count").notNull().default(0),
+    /**
+     * When an unattended photo run installed the current picture — the marker for
+     * "new" in the queue. Not ebay_photo_at: the reroll asks eBay too, and a photo
+     * you picked yourself isn't news. Cleared when a human chooses one.
+     */
+    photoFoundAt: timestamp("photo_found_at"),
 
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

@@ -422,6 +422,9 @@ export async function ingestGame(
           // isn't load-bearing — nothing reads it to make a decision — so there's
           // nothing to protect by keeping it.
           photoReviewCount: sql`CASE WHEN excluded.image_url IS NOT NULL THEN 0 ELSE ${cards.photoReviewCount} END`,
+          // Nothing is newly arrived once there's real art — the borrowed photo
+          // this pointed at is gone, and the card has left the queue for good.
+          photoFoundAt: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.photoFoundAt} END`,
 
           updatedAt: sql`now()`,
         },
