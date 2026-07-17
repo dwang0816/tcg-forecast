@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 import { isAdmin, signIn, signOut } from "@/lib/admin";
 import { PRICES_TAG } from "@/lib/cached";
-import { ebayToken, findListingPhoto } from "@/lib/ebay";
+import { ebayToken, ebayConfigured, findListingPhoto } from "@/lib/ebay";
 
 /**
  * Every action re-checks isAdmin(). Server Actions are POST endpoints anyone can
@@ -108,8 +108,21 @@ export async function replacePhoto(productId: number): Promise<{
   reviewCount: number;
 } | null> {
   if (!(await isAdmin())) throw new Error("Not signed in");
+  // Two different failures, two different messages. Production sanitises both
+  // away from the browser, but the server log is where you actually read this,
+  // and "missing" pointed at the wrong thing entirely when the variables were
+  // set and eBay was simply refusing them.
+  if (!ebayConfigured()) {
+    throw new Error(
+      "eBay credentials are not set on the server — add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET",
+    );
+  }
   const token = await ebayToken();
-  if (!token) throw new Error("eBay credentials are missing on the server");
+  if (!token) {
+    throw new Error(
+      "eBay refused the server's credentials — EBAY_CLIENT_ID/EBAY_CLIENT_SECRET are set but not accepted (see the [ebay] log line for the status)",
+    );
+  }
   const db = getDb();
   const rowsOf = <T,>(r: unknown) => ((r as { rows?: T[] }).rows ?? []);
 

@@ -39,6 +39,18 @@ const BROWSE = "https://api.ebay.com/buy/browse/v1/item_summary/search";
 let cachedToken: { value: string; expires: number } | null = null;
 
 /** Client-credentials token, reused until shortly before it expires. */
+/**
+ * Are the credentials present at all?
+ *
+ * Separate from ebayToken() because "nobody configured this" and "eBay said no"
+ * need different answers, and a null token can't tell them apart. Conflating them
+ * cost a real debugging session: the server logged "credentials are missing" while
+ * both variables were sitting right there in the environment.
+ */
+export function ebayConfigured(): boolean {
+  return Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
+}
+
 export async function ebayToken(): Promise<string | null> {
   if (cachedToken && Date.now() < cachedToken.expires) return cachedToken.value;
   const id = process.env.EBAY_CLIENT_ID;
@@ -55,7 +67,18 @@ export async function ebayToken(): Promise<string | null> {
       "grant_type=client_credentials&scope=" +
       encodeURIComponent("https://api.ebay.com/oauth/api_scope"),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Say so loudly. A silent null here reads downstream as "not configured",
+    // which sends whoever is debugging to check environment variables that were
+    // never the problem. 401 means the id/secret are set but wrong — a stray
+    // newline from a shell pipe does exactly this.
+    console.error(
+      `[ebay] OAuth refused the credentials: ${res.status} ${res.statusText}. ` +
+        `EBAY_CLIENT_ID is set (${id.length} chars) and EBAY_CLIENT_SECRET is set ` +
+        `(${secret.length} chars), so they are present but not accepted.`,
+    );
+    return null;
+  }
   const j = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = {
     value: j.access_token,
