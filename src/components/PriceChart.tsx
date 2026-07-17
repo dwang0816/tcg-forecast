@@ -54,6 +54,20 @@ const SURFACE = "#141419";
 const GRID = "#26262e";
 const AXIS_TEXT = "#8b8b96";
 
+// How far above the typical price an ask may sit and still be believed enough to
+// stretch the y-axis. Generous on purpose: a wide band is real information on a
+// thin card, and clipping a legitimate ask costs more than a little headroom.
+// The junk this exists to reject isn't near the line — it misses by 100x–10000x.
+const BAND_CEILING = 8;
+
+/** Middle value — a card's typical price, unmoved by a few junk asks. */
+function median(xs: number[]): number {
+  if (xs.length === 0) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
 // right leaves room for the endpoint price label, which sits outside the plot.
 const PAD = { top: 20, right: 84, bottom: 28, left: 56 };
 const W = 760;
@@ -122,14 +136,47 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
     const dates = Array.from(
       new Set(series.flatMap((s) => s.points.map((p) => p.date))),
     ).sort();
-    // Scale to the band as well as the line — otherwise the band clips.
-    const values = series.flatMap((s) =>
-      s.points.flatMap((p) =>
-        [p.market, p.low, p.high].filter((v): v is number => v != null),
-      ),
+    const pool = (get: (p: SeriesStats["points"][number]) => number | null) =>
+      series.flatMap((s) =>
+        s.points.map(get).filter((v): v is number => v != null),
+      );
+    const paid = pool((p) => p.market);
+    const lows = pool((p) => p.low);
+    const highs = pool((p) => p.high);
+
+    // An asking price is unbounded, and TCGplayer carries some absurd ones: a
+    // $21 card asking $9,999.99 (which slips under the 99999 "no data" sentinel
+    // tracking.ts screens for), a $30 Iron Moth asking $214,213.52. Pooling
+    // those straight into the domain is what pinned yMax near $11k and squashed
+    // a card that really moved $19.61–$58.57 into the bottom half-percent of the
+    // plot — a flat line, on a chart whose whole job is showing the move.
+    //
+    // The cutoff hangs off the MEDIAN, not any field's max. Two reasons: junk can
+    // land in any of the three fields (Iron Moth carries 214213.52 as both its
+    // low and its high, so no single field is trustworthy enough to size by), and
+    // the median is what the card typically costs — which is the scale a reader
+    // is actually trying to see. Sizing off max(paid) instead was measurably
+    // worse: on a card that ran 572% it let asks 6x the price back in and
+    // squashed the line all over again.
+    //
+    // A grail may never have sold through TCGplayer and has no market price at
+    // all; then the asks are all we have and the lows carry the median.
+    const anchor = paid.length ? paid : lows.length ? lows : highs;
+
+    // Market is a price someone actually PAID — ingest trusts it unconditionally
+    // (sanePrice in lib/tracking.ts) and no seller's fantasy moves it — so it is
+    // never clipped: the line and its ▲/▼ markers always fit, whatever the
+    // median says. Asks get in only within reach of typical. Above the ceiling
+    // the plot clips instead of the axis stretching to meet it. Tune
+    // BAND_CEILING, not this comment.
+    const ceiling = Math.max(
+      paid.length ? Math.max(...paid) : 0,
+      median(anchor) * BAND_CEILING,
     );
-    let lo = Math.min(...values);
-    let hi = Math.max(...values);
+    const kept = [...paid, ...lows, ...highs].filter((v) => v <= ceiling);
+
+    let lo = Math.min(...(kept.length ? kept : anchor));
+    let hi = Math.max(...(kept.length ? kept : anchor));
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
       lo = 0;
       hi = 1;
@@ -308,6 +355,18 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           onMouseLeave={() => setHoverIdx(null)}
         >
           <defs>
+            {/* An ask above the ceiling is still drawn — it just gets cut off at
+                the plot edge instead of dragging the axis up to meet it. Running
+                off the top reads as "higher than this view", which is honest and
+                is what it is. */}
+            <clipPath id={`plot-${uid}`}>
+              <rect
+                x={PAD.left}
+                y={PAD.top}
+                width={W - PAD.left - PAD.right}
+                height={H - PAD.top - PAD.bottom}
+              />
+            </clipPath>
             {series.map((s, i) => (
               <linearGradient
                 key={s.label}
@@ -380,6 +439,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           {bandPath && (
             <path
               className={`fade-${uid}`}
+              clipPath={`url(#plot-${uid})`}
               d={bandPath}
               fill={BAND_COLOR}
               fillOpacity="0.26"
