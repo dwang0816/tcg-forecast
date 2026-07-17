@@ -106,14 +106,25 @@ export default async function AdminPhotosPage({
         SELECT game,
           count(*) FILTER (WHERE ebay_photo_url IS NOT NULL AND photo_verdict IS NULL)::int AS todo,
           count(*) FILTER (WHERE photo_verdict = 'good')::int AS good,
-          count(*) FILTER (WHERE photo_verdict = 'bad')::int  AS bad
+          count(*) FILTER (WHERE photo_verdict = 'bad')::int  AS bad,
+          -- What the queue actually holds. NOT good+bad+todo: rejecting blanks a
+          -- card, and a card with no photo has nothing to judge, so it isn't in
+          -- the rotation. Deriving the badge from the verdict counts claimed a
+          -- Riftbound queue of 10 while showing 6.
+          count(*) FILTER (WHERE ebay_photo_url IS NOT NULL)::int AS queue
         FROM cards
         GROUP BY game
       `),
     ]);
     return {
       cards: rowsOf<ReviewCard & { game: string }>(cards),
-      byGame: rowsOf<{ game: string; todo: number; good: number; bad: number }>(counts),
+      byGame: rowsOf<{
+        game: string;
+        todo: number;
+        good: number;
+        bad: number;
+        queue: number;
+      }>(counts),
     };
   });
 
@@ -130,11 +141,17 @@ export default async function AdminPhotosPage({
   // of one card would be answering a question nobody asked.
   const scope = game === "all" ? byGame : byGame.filter((r) => r.game === game);
   const counts = scope.reduce(
-    (a, r) => ({ todo: a.todo + r.todo, good: a.good + r.good, bad: a.bad + r.bad }),
-    { todo: 0, good: 0, bad: 0 },
+    (a, r) => ({
+      todo: a.todo + r.todo,
+      good: a.good + r.good,
+      bad: a.bad + r.bad,
+      queue: a.queue + r.queue,
+    }),
+    { todo: 0, good: 0, bad: 0, queue: 0 },
   );
-  const done = counts.good + counts.bad;
-  const total = done + counts.todo;
+  // Progress is over the rotation — the cards you can actually be asked about.
+  const total = counts.queue;
+  const done = total - counts.todo;
   const gameLabel = game === "all" ? null : GAME_BY_SLUG[game].name;
 
   const enriched: ReviewCard[] = cards.map((c) => ({
