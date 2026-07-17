@@ -148,6 +148,11 @@ export function ReviewGrid({
                   <button
                     onClick={() => unjudge(c.productId)}
                     className="flex-1 rounded-lg border border-white/15 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+                    title={
+                      c.photoUrl
+                        ? "Clear this verdict and put the card back in the queue."
+                        : "Clear this verdict and un-blacklist the photo. The picture itself comes back on the next `pnpm run photos` run."
+                    }
                   >
                     Undo
                   </button>

@@ -148,7 +148,26 @@ export default async function AdminPhotosPage({
               : "No photos rejected yet."}
         </p>
       ) : (
-        <ReviewGrid cards={enriched} reviewed={show !== "todo"} />
+        <>
+          {show === "bad" && (
+            <p className="text-xs leading-relaxed text-white/35">
+              Rejecting cleared the picture and blacklisted it, so the photo job
+              can look for a different listing but never that one again. These
+              cards show a blank until it finds one. <strong className="font-medium text-white/50">Undo</strong>{" "}
+              lifts the blacklist — the picture returns on the next{" "}
+              <code className="rounded bg-white/5 px-1">pnpm run photos</code> run,
+              not immediately.
+            </p>
+          )}
+          {show === "good" && (
+            <p className="text-xs leading-relaxed text-white/35">
+              These are live on the site, captioned as seller photos. If TCGplayer
+              ever publishes real art for one, the next ingest drops the photo and
+              this verdict automatically — official art always wins.
+            </p>
+          )}
+          <ReviewGrid cards={enriched} reviewed={show !== "todo"} />
+        </>
       )}
 
       {show === "todo" && counts.todo > PAGE && (

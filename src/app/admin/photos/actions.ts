@@ -69,6 +69,18 @@ export async function reject(productId: number) {
   `);
   revalidatePath("/admin/photos");
   revalidatePath(`/card/${productId}`);
+  // The card page is uncached and fixes itself, but the TILES aren't: Most
+  // Valuable, the movers lists and search all read through the day-long cache.
+  // Without this, rejecting a bad photo left it sitting on every list for 24
+  // hours — the exact opposite of what pressing the button means.
+  //
+  // Only on reject. Approving changes nothing anyone can see, so invalidating
+  // the cache for it would be pure churn.
+  //
+  // "max" is stale-while-revalidate: a reviewer working through a batch marks
+  // the tag stale repeatedly without firing off blocking scans of the history
+  // table behind each click.
+  revalidateTag(PRICES_TAG, "max");
 }
 
 /**
@@ -94,12 +106,29 @@ export async function refreshCache() {
 export async function undo(productId: number) {
   if (!(await isAdmin())) throw new Error("Not signed in");
   const db = getDb();
-  // Only clears the verdict. A rejected photo's URL stays on the reject list and
-  // its fields stay cleared: the picture is gone either way, and un-rejecting it
-  // would mean re-running the photo job anyway.
+  // Clearing the verdict alone was a trap. Reject blacklists the photo URL and
+  // clears the photo, so a verdict-only undo left the card with no photo, no
+  // verdict, and a permanent blacklist entry — invisible in all three tabs (To
+  // review needs a photo; Good and Bad need a verdict) and unrecoverable, because
+  // the photo job skips blacklisted URLs. One mis-click and the card was gone.
+  //
+  // So undoing a rejection also lifts the blacklist. The photo itself can't come
+  // back here — reject dropped the listing url/title/price and we don't keep them
+  // — but the next `pnpm run photos` can now re-find that listing instead of
+  // skipping it forever.
   await db.execute(sql`
-    UPDATE cards SET photo_verdict = NULL, photo_reviewed_at = NULL
+    UPDATE cards SET
+      photo_verdict = NULL,
+      photo_reviewed_at = NULL,
+      rejected_photo_urls = CASE
+        WHEN photo_verdict = 'bad' AND array_length(rejected_photo_urls, 1) > 0
+          THEN rejected_photo_urls[1:array_length(rejected_photo_urls, 1) - 1]
+        ELSE rejected_photo_urls
+      END,
+      -- Null means "never asked", which puts it back in the photo job's queue.
+      ebay_photo_at = CASE WHEN photo_verdict = 'bad' THEN NULL ELSE ebay_photo_at END
     WHERE product_id = ${productId}
   `);
   revalidatePath("/admin/photos");
+  revalidateTag(PRICES_TAG, "max");
 }
