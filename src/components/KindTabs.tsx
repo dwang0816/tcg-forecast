@@ -22,7 +22,7 @@ export function KindTabs({
   makeHref: (k: Kind) => string;
 }) {
   return (
-    <nav className="inline-flex rounded-lg border border-white/10 bg-white/[0.02] p-1">
+    <nav className="inline-flex rounded-lg border border-edge bg-panel p-1">
       {TABS.map((t) => {
         const active = t.key === kind;
         return (
@@ -32,8 +32,8 @@ export function KindTabs({
             aria-current={active ? "page" : undefined}
             className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
               active
-                ? "bg-white/12 text-white"
-                : "text-white/45 hover:text-white/75"
+                ? "bg-panel-hi text-ink"
+                : "text-ink-faint hover:text-ink-dim"
             }`}
           >
             {t.label}

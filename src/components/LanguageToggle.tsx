@@ -20,9 +20,7 @@ export function LanguageToggle({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs uppercase tracking-wide text-white/30">
-        Language
-      </span>
+      <span className="kicker">Language</span>
       {OPTIONS.map((o) => {
         const active = o.key === language;
         return (
@@ -30,10 +28,10 @@ export function LanguageToggle({
             key={o.key}
             href={makeHref(o.key)}
             aria-current={active ? "page" : undefined}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-full px-3.5 py-1.5 font-mono text-xs font-semibold transition-colors ${
               active
-                ? "bg-white text-black"
-                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                ? "bg-gold text-graphite"
+                : "bg-panel text-ink-faint hover:bg-panel-hi hover:text-ink-dim"
             }`}
           >
             {o.label}

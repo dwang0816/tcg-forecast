@@ -1,22 +1,110 @@
 @import "tailwindcss";
 
+/**
+ * TCG Forecast — brand direction 2A "Foil · Terminal".
+ *
+ * Graphite surfaces, foil gold for value, green/red for movement, and a
+ * per-game accent that's always a gradient dot rather than a fill: the game
+ * colors are borrowed from the games themselves, so they can't be trusted to
+ * contrast with text the way our own palette can.
+ */
+@theme {
+  /* Surfaces, darkest to lightest. */
+  --color-graphite: #0c0c10;
+  --color-panel: #141419;
+  --color-panel-hi: #191921;
+  --color-edge: #26262e;
+  /* Warm edge — for panels that carry gold, so the border doesn't read cold. */
+  --color-edge-warm: #2a2620;
+
+  --color-ink: #f4f4f6;
+  --color-ink-dim: oklch(0.72 0.01 260);
+  --color-ink-faint: oklch(0.6 0.02 260);
+
+  /* Foil gold is the value/premium color. It never means "warning". */
+  --color-gold: oklch(0.8 0.13 85);
+  --color-gold-bright: oklch(0.85 0.13 85);
+  /* Price movement. Finance-native and card-condition native. */
+  --color-up: oklch(0.75 0.16 150);
+  --color-up-bright: oklch(0.85 0.16 150);
+  --color-down: oklch(0.65 0.19 25);
+  --color-down-bright: oklch(0.75 0.19 25);
+
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
 :root {
-  --background: #07070a;
-  --foreground: #ededed;
+  --background: var(--color-graphite);
+  --foreground: var(--color-ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-display);
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 50% -200px, rgba(99, 102, 241, 0.12), transparent),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-display);
   min-height: 100vh;
+}
+
+/**
+ * The terminal grid, straight off the brand's banner. Fixed rather than scrolled
+ * so it reads as the surface the app sits on instead of a texture in the page,
+ * and masked toward the bottom so long lists end on clean graphite.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, #16161c 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, #16161c 0 1px, transparent 1px 44px);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 92%);
+}
+
+/**
+ * Per-game accents. Each is the game's own two colors split on a diagonal —
+ * recognisable at 9px, which is the only size we ever use them at.
+ *
+ * Plain CSS classes, not Tailwind utilities: they're two-stop gradients keyed by
+ * a runtime value (game.slug), and Tailwind can't generate what it can't see in
+ * the source.
+ */
+.accent-pokemon {
+  background: linear-gradient(135deg, #ffcb05 50%, #2a75bb 50%);
+}
+.accent-onepiece {
+  background: linear-gradient(135deg, #e60012 50%, #e0a93b 50%);
+}
+.accent-riftbound {
+  background: linear-gradient(135deg, #c8aa6e 50%, #0ac8b9 50%);
+}
+
+/* Text tints for the same three. Lifted off the raw brand colors for legibility
+   on graphite — #E60012 red in particular is unreadable as small text on black. */
+.accent-text-pokemon {
+  color: #ffcb05;
+}
+.accent-text-onepiece {
+  color: oklch(0.7 0.19 27);
+}
+.accent-text-riftbound {
+  color: #0ac8b9;
+}
+
+/* Mono-uppercase micro-label — the brand's connective tissue. Used often enough
+   (section kickers, field labels, tags) to be worth a name. */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
 }

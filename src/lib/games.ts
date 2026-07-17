@@ -15,7 +15,14 @@ export interface Game {
    * English-only there, so they have no JP entry and get no language toggle.
    */
   categories: { EN: number; JP?: number };
-  /** Tailwind accent classes for this game's theming. */
+  /**
+   * Accent classes for this game's theming, defined in globals.css rather than
+   * Tailwind: each is the game's own two colors on a diagonal, which is a
+   * gradient keyed by a runtime slug — nothing Tailwind can see to generate.
+   *
+   * `accent` is a background (dots only — see GameTag for why never text-on-it),
+   * `accentText` a legibility-corrected text tint.
+   */
   accent: string;
   accentText: string;
 }
@@ -25,22 +32,22 @@ export const GAMES: Game[] = [
     slug: "pokemon",
     name: "Pokémon",
     categories: { EN: 3, JP: 85 },
-    accent: "bg-amber-500",
-    accentText: "text-amber-500",
+    accent: "accent-pokemon",
+    accentText: "accent-text-pokemon",
   },
   {
     slug: "onepiece",
     name: "One Piece",
     categories: { EN: 68 },
-    accent: "bg-rose-500",
-    accentText: "text-rose-500",
+    accent: "accent-onepiece",
+    accentText: "accent-text-onepiece",
   },
   {
     slug: "riftbound",
     name: "Riftbound",
     categories: { EN: 89 },
-    accent: "bg-indigo-500",
-    accentText: "text-indigo-500",
+    accent: "accent-riftbound",
+    accentText: "accent-text-riftbound",
   },
 ];
 

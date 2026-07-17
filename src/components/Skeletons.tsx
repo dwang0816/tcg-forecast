@@ -13,7 +13,7 @@
 function Shimmer({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded bg-white/[0.06] ${className}`}
+      className={`animate-pulse rounded bg-panel-hi ${className}`}
       aria-hidden
     />
   );
@@ -22,8 +22,8 @@ function Shimmer({ className = "" }: { className?: string }) {
 /** One card tile: image block, name, identity lines, price row. */
 function TileSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
-      <div className="aspect-[5/7] animate-pulse bg-white/[0.05]" aria-hidden />
+    <div className="flex flex-col overflow-hidden rounded-xl border border-edge bg-panel">
+      <div className="aspect-[5/7] animate-pulse bg-panel-hi" aria-hidden />
       <div className="flex flex-col gap-2 p-3">
         <Shimmer className="h-4 w-3/4" />
         <Shimmer className="h-3 w-1/2" />
@@ -41,7 +41,7 @@ function TileSkeleton() {
 export function TileGridSkeleton({ count = 10 }: { count?: number }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
+      <div className="flex items-baseline justify-between border-b border-edge pb-2">
         <Shimmer className="h-6 w-44" />
         <Shimmer className="h-3 w-56" />
       </div>
@@ -57,7 +57,7 @@ export function TileGridSkeleton({ count = 10 }: { count?: number }) {
 /** The methodology note above the movers lists. */
 export function MethodologySkeleton() {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+    <div className="rounded-2xl border border-edge bg-panel p-5">
       <Shimmer className="h-5 w-52" />
       <Shimmer className="mt-2 h-3 w-72" />
       <Shimmer className="mt-4 h-20 w-full rounded-xl" />

@@ -9,6 +9,8 @@ export function parseView(v: string | undefined): View {
 export const isMoversView = (v: View) => v === "gainers" || v === "losers";
 
 // Tailwind needs literal class names, so the active styles are spelled out.
+// Each tab wears the color of the thing it selects: green rising, red falling,
+// gold for value. That's the whole palette doing its job.
 const TABS: {
   key: View;
   icon: string;
@@ -21,33 +23,33 @@ const TABS: {
     icon: "▲",
     label: () => "Top 20 Gainers",
     hint: "biggest risers",
-    active: "border-emerald-500/50 bg-emerald-500/15 text-emerald-300",
+    active: "border-up/50 bg-up/10 text-up-bright",
   },
   {
     key: "losers",
     icon: "▼",
     label: () => "Top 20 Losers",
     hint: "biggest fallers",
-    active: "border-rose-500/50 bg-rose-500/15 text-rose-300",
+    active: "border-down/50 bg-down/10 text-down-bright",
   },
   {
     key: "valuable",
     icon: "★",
     label: (sealed) => (sealed ? "Most Valuable Sealed" : "Most Valuable"),
     hint: "confirmed prices",
-    active: "border-amber-500/50 bg-amber-500/15 text-amber-200",
+    active: "border-gold/50 bg-gold/10 text-gold-bright",
   },
   {
     key: "unconfirmed",
     icon: "◇",
     label: () => "Unconfirmed",
     hint: "asking price only",
-    active: "border-white/30 bg-white/10 text-white/85",
+    active: "border-ink-faint/50 bg-panel-hi text-ink",
   },
 ];
 
 const INACTIVE =
-  "border-white/10 bg-white/[0.02] text-white/45 hover:border-white/20 hover:bg-white/5 hover:text-white/80";
+  "border-edge bg-panel text-ink-faint hover:border-ink-faint/40 hover:bg-panel-hi hover:text-ink-dim";
 
 export function ViewTabs({
   view,
@@ -67,15 +69,17 @@ export function ViewTabs({
             key={t.key}
             href={makeHref(t.key)}
             aria-current={isActive ? "page" : undefined}
-            className={`flex flex-col items-center gap-0.5 rounded-xl border px-3 py-3 text-center transition-colors ${
+            className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-3 text-center transition-colors ${
               isActive ? t.active : INACTIVE
             }`}
           >
-            <span className="text-sm font-semibold leading-tight sm:text-base">
+            <span className="font-display text-sm font-bold leading-tight tracking-tight sm:text-base">
               <span className="mr-1.5">{t.icon}</span>
               {t.label(sealed)}
             </span>
-            <span className="text-[11px] opacity-70">{t.hint}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider opacity-70">
+              {t.hint}
+            </span>
           </Link>
         );
       })}

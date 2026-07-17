@@ -24,10 +24,12 @@ export function MoversSection({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-edge pb-2">
+        <h2 className="font-display text-lg font-bold tracking-tight text-ink">
+          {title}
+        </h2>
         {rows.length > 0 && (
-          <span className="text-xs text-white/40">
+          <span className="font-mono text-[11px] text-ink-faint">
             over {actualDays} day{actualDays === 1 ? "" : "s"} ·{" "}
             {formatDate(rows[0].prevDate)} → {formatDate(rows[0].latestDate)}
           </span>
@@ -60,7 +62,7 @@ export function MoversSection({
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center text-sm text-white/40">
+        <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-8 text-center text-sm text-ink-dim">
           {emptyBody}
         </p>
       )}

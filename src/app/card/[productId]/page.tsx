@@ -77,34 +77,34 @@ export default async function CardPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-faint">
         {game && (
-          <Link href={`/${game.slug}`} className="hover:text-white/70">
+          <Link href={`/${game.slug}`} className="hover:text-ink-dim">
             {game.name}
           </Link>
         )}
         <span>·</span>
         <span>{card.groupName}</span>
         {card.language === "JP" && (
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">JP</span>
+          <span className="rounded bg-panel-hi px-1.5 py-0.5 text-[10px]">JP</span>
         )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,300px)_1fr]">
         {/* Image */}
         <div className="flex flex-col gap-2">
-          <div className="relative aspect-[5/7] overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+          <div className="relative aspect-[5/7] overflow-hidden rounded-2xl border border-edge bg-graphite">
             <CardImage sources={sources} alt={card.name} />
             {game && (
               <span
-                className={`absolute bottom-3 left-3 rounded-md px-2 py-0.5 text-[11px] font-semibold text-white ${game.accent}`}
+                className={`absolute bottom-3 left-3 rounded-md px-2 py-0.5 text-[11px] font-semibold text-ink ${game.accent}`}
               >
                 {game.name}
               </span>
             )}
           </div>
           {listingPhoto && (
-            <p className="text-[11px] leading-snug text-white/40">
+            <p className="text-[11px] leading-snug text-ink-faint">
               No official picture exists for this card, so this is a photo from a
               live eBay listing
               {card.ebayListingPrice != null ? ` (${money(card.ebayListingPrice)})` : ""}
@@ -114,7 +114,7 @@ export default async function CardPage({
                   href={card.ebayListingUrl}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="text-white/60 underline underline-offset-2 hover:text-white/90"
+                  className="text-ink-dim underline underline-offset-2 hover:text-ink"
                 >
                   See the listing ↗
                 </a>
@@ -126,10 +126,10 @@ export default async function CardPage({
         {/* Headline */}
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
               {card.name}
             </h1>
-            <p className="mt-1 text-sm text-white/45">
+            <p className="mt-1 text-sm text-ink-faint">
               {card.groupName}
               {card.rarity ? ` · ${card.rarity}` : ""}
               {card.number ? ` · ${card.number}` : ""}
@@ -139,7 +139,7 @@ export default async function CardPage({
           {primary ? (
             <CardPriceHeadline s={primary} />
           ) : (
-            <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm text-white/40">
+            <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-6 text-sm text-ink-faint">
               We haven&apos;t recorded a price for this one yet. It&apos;ll appear
               after the next daily update.
             </p>
@@ -150,7 +150,7 @@ export default async function CardPage({
               href={card.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-edge bg-panel px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-panel-hi hover:text-ink"
             >
               Buy on TCGplayer ↗
             </a>
@@ -164,9 +164,9 @@ export default async function CardPage({
 
       {/* Chart */}
       <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-edge pb-2">
           <h2 className="text-lg font-semibold">Price history</h2>
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-ink-faint">
             {history.length > 0
               ? `daily snapshots · ${formatDate(history[0].date)} → ${formatDate(history[history.length - 1].date)}`
               : "no history yet"}
@@ -178,7 +178,7 @@ export default async function CardPage({
       {/* Card data */}
       {(prose.length > 0 || stats.length > 0) && (
         <section className="flex flex-col gap-3">
-          <div className="border-b border-white/10 pb-2">
+          <div className="border-b border-edge pb-2">
             <h2 className="text-lg font-semibold">Card details</h2>
           </div>
 
@@ -187,12 +187,12 @@ export default async function CardPage({
               {stats.map((f) => (
                 <div
                   key={f.name}
-                  className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2"
+                  className="rounded-lg border border-edge bg-panel/50 px-3 py-2"
                 >
-                  <dt className="text-[11px] uppercase tracking-wide text-white/35">
+                  <dt className="text-[11px] uppercase tracking-wide text-ink-faint">
                     {f.displayName || f.name}
                   </dt>
-                  <dd className="mt-0.5 text-sm text-white/80">
+                  <dd className="mt-0.5 text-sm text-ink">
                     {stripHtml(f.value)}
                   </dd>
                 </div>
@@ -203,12 +203,12 @@ export default async function CardPage({
           {prose.map((f) => (
             <div
               key={f.name}
-              className="rounded-lg border border-white/10 bg-white/[0.02] p-4"
+              className="rounded-lg border border-edge bg-panel/50 p-4"
             >
-              <div className="text-[11px] uppercase tracking-wide text-white/35">
+              <div className="text-[11px] uppercase tracking-wide text-ink-faint">
                 {f.displayName || f.name}
               </div>
-              <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-white/70">
+              <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-ink-dim">
                 {stripHtml(f.value)}
               </p>
             </div>

@@ -16,10 +16,10 @@ function Reading({
 }) {
   return (
     <span className="flex flex-col gap-0.5">
-      <span className="text-[11px] leading-none text-white/40">{label}</span>
+      <span className="text-[11px] leading-none text-ink-faint">{label}</span>
       <span
         className={`leading-none tabular-nums ${
-          strong ? "font-semibold text-white" : "text-white/75"
+          strong ? "font-semibold text-ink" : "text-ink-dim"
         }`}
       >
         {value}
@@ -36,7 +36,7 @@ const RANGES: { label: string; days: number | null }[] = [
   { label: "All", days: null },
 ];
 
-// Validated against our dark surface (#12121a) with the dataviz validator:
+// Validated against our dark surface with the dataviz validator:
 // lightness band, chroma floor, CVD separation and contrast all pass, worst
 // adjacent ΔE 41.3 (protan) across the three together.
 const SERIES_COLORS = ["#3987e5", "#199e70"];
@@ -45,6 +45,14 @@ const SERIES_COLORS = ["#3987e5", "#199e70"];
 // than a tint of the line. Amber is the CVD-safe partner to blue, and it's the
 // one categorical slot that can't be mistaken for a second printing's aqua.
 const BAND_COLOR = "#c98500";
+
+// Chart chrome, matched to the brand's panel/edge/ink-faint. The series colors
+// above deliberately aren't brand colors: they're carrying data, they were
+// picked and CVD-validated as a set, and foil gold sits close enough to the
+// amber band to muddy exactly the comparison this chart exists to make.
+const SURFACE = "#141419";
+const GRID = "#26262e";
+const AXIS_TEXT = "#8b8b96";
 
 // right leaves room for the endpoint price label, which sits outside the plot.
 const PAD = { top: 20, right: 84, bottom: 28, left: 56 };
@@ -139,7 +147,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
 
   if (dates.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center text-sm text-white/40">
+      <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-10 text-center text-sm text-ink-faint">
         No price history recorded for this card yet.
       </p>
     );
@@ -218,8 +226,8 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                 aria-pressed={active}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
                   active
-                    ? "bg-white/15 text-white"
-                    : "text-white/45 hover:bg-white/5 hover:text-white/75"
+                    ? "bg-panel-hi text-ink"
+                    : "text-ink-faint hover:bg-panel hover:text-ink-dim"
                 }`}
               >
                 {r.label}
@@ -233,20 +241,20 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           person to see this chart asked "what's the blue in the background?",
           which is the whole point of it. Say what each mark MEANS, not what it
           is called. */}
-      <div className="flex flex-col gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-xs">
-        <span className="flex items-start gap-2 text-white/60">
+      <div className="flex flex-col gap-1.5 rounded-lg border border-edge bg-panel/50 px-3 py-2.5 text-xs">
+        <span className="flex items-start gap-2 text-ink-dim">
           <span
             aria-hidden
             className="mt-1.5 h-0.5 w-4 shrink-0 rounded-full"
             style={{ background: SERIES_COLORS[0] }}
           />
           <span>
-            <strong className="font-semibold text-white/80">The line</strong> is
+            <strong className="font-semibold text-ink">The line</strong> is
             what people <em>paid</em> — it only moves when a copy actually sells.
           </span>
         </span>
         {hasBand && (
-          <span className="flex items-start gap-2 text-white/60">
+          <span className="flex items-start gap-2 text-ink-dim">
             <span
               aria-hidden
               className="mt-1 h-2.5 w-4 shrink-0 rounded-sm border"
@@ -256,7 +264,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
               }}
             />
             <span>
-              <strong className="font-semibold text-white/80">The shaded band</strong>{" "}
+              <strong className="font-semibold text-ink">The shaded band</strong>{" "}
               is what sellers are <em>asking</em>
               {series.length > 1 ? ` (${primary.label})` : ""} — top edge is the
               priciest copy listed, bottom edge the cheapest. Above the line means
@@ -265,7 +273,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           </span>
         )}
         {series.length > 1 && (
-          <span className="flex flex-wrap items-center gap-3 pt-0.5 text-white/45">
+          <span className="flex flex-wrap items-center gap-3 pt-0.5 text-ink-faint">
             {series.map((s, i) => (
               <span key={s.label} className="flex items-center gap-1.5">
                 <span
@@ -279,7 +287,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           </span>
         )}
         {hasBand && (
-          <span className="pt-0.5 text-[11px] leading-snug text-white/35">
+          <span className="pt-0.5 text-[11px] leading-snug text-ink-faint">
             The cheapest copy isn&apos;t always a fair comparison — TCGplayer&apos;s
             low price counts every condition, so the band&apos;s bottom edge can be a
             damaged card.
@@ -287,7 +295,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#12121a] p-2">
+      <div className="overflow-x-auto rounded-xl border border-edge bg-panel p-2">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="h-[300px] w-full min-w-[560px]"
@@ -331,14 +339,14 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                 x2={W - PAD.right}
                 y1={yFor(t)}
                 y2={yFor(t)}
-                stroke="#2c2c2a"
+                stroke={GRID}
                 strokeWidth="1"
               />
               <text
                 x={PAD.left - 8}
                 y={yFor(t) + 3}
                 textAnchor="end"
-                fill="#898781"
+                fill={AXIS_TEXT}
                 fontSize="10"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
@@ -347,14 +355,14 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
             </g>
           ))}
 
-          <text x={PAD.left} y={H - 8} fill="#898781" fontSize="10">
+          <text x={PAD.left} y={H - 8} fill={AXIS_TEXT} fontSize="10">
             {formatDate(dates[0])}
           </text>
           <text
             x={W - PAD.right}
             y={H - 8}
             textAnchor="end"
-            fill="#898781"
+            fill={AXIS_TEXT}
             fontSize="10"
           >
             {formatDate(dates[dates.length - 1])}
@@ -429,7 +437,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                           cx={xFor(idxOf(e.date))}
                           cy={yFor(e.price)}
                           r="3"
-                          fill="#12121a"
+                          fill={SURFACE}
                           stroke={color}
                           strokeWidth="1.5"
                         />
@@ -443,7 +451,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                               : yFor(e.price) + 14
                           }
                           textAnchor="middle"
-                          fill="#898781"
+                          fill={AXIS_TEXT}
                           fontSize="9.5"
                           style={{ fontVariantNumeric: "tabular-nums" }}
                         >
@@ -466,7 +474,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                     cy={yFor(last.market!)}
                     r="4"
                     fill={color}
-                    stroke="#12121a"
+                    stroke={SURFACE}
                     strokeWidth="2"
                   />
                   <text
@@ -486,7 +494,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                     cy={yFor(hovered.market!)}
                     r="4.5"
                     fill={color}
-                    stroke="#12121a"
+                    stroke={SURFACE}
                     strokeWidth="2"
                   />
                 )}
@@ -545,8 +553,8 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
           $1,500.00–$2,000.00)" and left the reader to work out which was
           which — the same failure as the legend. */}
       {hoverDate && (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
-          <div className="mb-2 font-medium text-white/70">
+        <div className="rounded-lg border border-edge bg-panel px-3 py-2.5 text-xs">
+          <div className="mb-2 font-medium text-ink-dim">
             {formatDate(hoverDate)}
           </div>
           <div className="flex flex-col gap-2.5">
@@ -556,7 +564,7 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
               return (
                 <div key={s.label} className="flex flex-col gap-1.5">
                   {series.length > 1 && (
-                    <span className="flex items-center gap-1.5 text-white/50">
+                    <span className="flex items-center gap-1.5 text-ink-dim">
                       <span
                         aria-hidden
                         className="h-2 w-2 rounded-full"
@@ -587,14 +595,14 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
       <div>
         <button
           onClick={() => setShowTable((v) => !v)}
-          className="text-xs font-medium text-white/45 hover:text-white/75"
+          className="text-xs font-medium text-ink-faint hover:text-ink-dim"
         >
           {showTable ? "▾ Hide table" : "▸ View as table"}
         </button>
         {showTable && (
-          <div className="mt-2 max-h-64 overflow-auto rounded-lg border border-white/10">
+          <div className="mt-2 max-h-64 overflow-auto rounded-lg border border-edge">
             <table className="w-full text-left text-xs">
-              <thead className="sticky top-0 bg-[#12121a] text-white/40">
+              <thead className="sticky top-0 bg-panel text-ink-faint">
                 <tr>
                   <th className="px-3 py-2 font-medium">Date</th>
                   <th className="px-3 py-2 font-medium">Printing</th>
@@ -602,19 +610,19 @@ export function PriceChart({ series: all }: { series: SeriesStats[] }) {
                   <th className="px-3 py-2 font-medium">Asking low–high</th>
                 </tr>
               </thead>
-              <tbody className="tabular-nums text-white/70">
+              <tbody className="tabular-nums text-ink-dim">
                 {[...dates].reverse().map((d) =>
                   series.map((s) => {
                     const p = s.points.find((pt) => pt.date === d);
                     if (!p) return null;
                     return (
-                      <tr key={`${d}-${s.label}`} className="border-t border-white/5">
+                      <tr key={`${d}-${s.label}`} className="border-t border-edge">
                         <td className="px-3 py-1.5">{formatDate(d)}</td>
-                        <td className="px-3 py-1.5 text-white/50">{s.label}</td>
+                        <td className="px-3 py-1.5 text-ink-dim">{s.label}</td>
                         <td className="px-3 py-1.5">
                           {p.market != null ? money(p.market) : "—"}
                         </td>
-                        <td className="px-3 py-1.5 text-white/40">
+                        <td className="px-3 py-1.5 text-ink-faint">
                           {p.low != null && p.high != null
                             ? `${money(p.low)} – ${money(p.high)}`
                             : "—"}

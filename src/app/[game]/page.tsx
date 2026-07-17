@@ -58,7 +58,7 @@ async function StatsLine({
   );
   if (!stats) return null;
   return (
-    <p className="text-xs text-white/40">
+    <p className="font-mono text-[11px] text-ink-faint">
       {stats.cardCount.toLocaleString()} products · data through{" "}
       {formatDate(stats.latestDate)} · {stats.daysOfHistory} day
       {stats.daysOfHistory === 1 ? "" : "s"} tracked
@@ -251,9 +251,13 @@ export default async function GamePage({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          <span className={game.accentText}>{game.name}</span>{" "}
-          <span className="text-white/50">{what}</span>
+        <h1 className="flex items-center gap-2.5 font-display text-2xl font-bold tracking-tight">
+          <span
+            aria-hidden
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${game.accent}`}
+          />
+          <span className="text-ink">{game.name}</span>
+          <span className="text-ink-faint">{what}</span>
         </h1>
         <Suspense fallback={<StatsLineSkeleton />}>
           <StatsLine slug={slug} language={language} />

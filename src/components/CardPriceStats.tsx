@@ -47,32 +47,32 @@ function RangeBar({ s }: { s: SeriesStats }) {
   const cur = s.points.filter((p) => p.market != null).at(-1)?.market ?? null;
   return (
     <div>
-      <div className="mb-2 text-sm font-medium text-white/70">
+      <div className="mb-2 text-sm font-medium text-ink-dim">
         Where today&apos;s price sits {spanWords(s)}
       </div>
-      <div className="relative mt-1.5 h-1.5 rounded-full bg-gradient-to-r from-sky-500/25 via-white/15 to-emerald-500/30">
+      <div className="relative mt-1.5 h-1.5 rounded-full bg-gradient-to-r from-down/30 via-ink-faint/20 to-up/35">
         {/* The tick is the whole point of the bar, so it says what it is. */}
         <div
-          className="absolute -top-1 h-3.5 w-1 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+          className="absolute -top-1 h-3.5 w-1 -translate-x-1/2 rounded-full bg-gold shadow-[0_0_8px_rgba(228,183,80,0.7)]"
           style={{ left: `${pos * 100}%` }}
         />
         <span
-          className="absolute -top-6 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-white/80"
+          className="absolute -top-6 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-ink"
           style={{ left: `${Math.min(92, Math.max(8, pos * 100))}%` }}
         >
           today {money(cur ?? 0)}
         </span>
       </div>
       <div className="mt-2 flex items-baseline justify-between text-[11px]">
-        <span className="text-white/45">
+        <span className="text-ink-faint">
           cheapest it&apos;s been{" "}
-          <span className="tabular-nums text-white/70">{money(s.low.price)}</span>{" "}
-          <span className="text-white/30">· {formatDate(s.low.date)}</span>
+          <span className="tabular-nums text-ink-dim">{money(s.low.price)}</span>{" "}
+          <span className="text-ink-faint/70">· {formatDate(s.low.date)}</span>
         </span>
-        <span className="text-right text-white/45">
+        <span className="text-right text-ink-faint">
           priciest it&apos;s been{" "}
-          <span className="tabular-nums text-white/70">{money(s.high.price)}</span>{" "}
-          <span className="text-white/30">· {formatDate(s.high.date)}</span>
+          <span className="tabular-nums text-ink-dim">{money(s.high.price)}</span>{" "}
+          <span className="text-ink-faint/70">· {formatDate(s.high.date)}</span>
         </span>
       </div>
     </div>
@@ -92,17 +92,17 @@ function Fact({
 }) {
   const color =
     tone === "good"
-      ? "text-emerald-400"
+      ? "text-up-bright"
       : tone === "warn"
-        ? "text-amber-400"
+        ? "text-ink-dim"
         : tone === "bad"
-          ? "text-rose-400"
-          : "text-white/85";
+          ? "text-down-bright"
+          : "text-ink";
   return (
-    <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
-      <div className="text-[11px] uppercase tracking-wide text-white/35">{label}</div>
+    <div className="rounded-lg border border-edge bg-panel/50 px-3 py-2.5">
+      <div className="text-[11px] uppercase tracking-wide text-ink-faint">{label}</div>
       <div className={`mt-0.5 text-sm font-semibold tabular-nums ${color}`}>{value}</div>
-      {hint && <div className="mt-0.5 text-[11px] leading-snug text-white/35">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">{hint}</div>}
     </div>
   );
 }
@@ -140,12 +140,12 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
   return (
     <div className="flex flex-col gap-4">
       {stale && (
-        <div className="flex gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] px-3.5 py-3">
+        <div className="flex gap-2.5 rounded-xl border border-edge bg-panel-hi px-3.5 py-3">
           <span aria-hidden className="text-base leading-none">
             ⏳
           </span>
-          <div className="text-xs leading-relaxed text-amber-200/85">
-            <strong className="font-semibold text-amber-200">
+          <div className="text-xs leading-relaxed text-ink-dim">
+            <strong className="font-semibold text-ink">
               This price is {s.staleDays} days old.
             </strong>{" "}
             Market price only updates when someone actually buys a copy, and
@@ -156,7 +156,7 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
               <>
                 {" "}
                 Sellers are currently asking{" "}
-                <strong className="font-semibold text-amber-200">
+                <strong className="font-semibold text-ink">
                   {percentPlain(askGap)} more
                 </strong>{" "}
                 than that last sale — treat the asking range as the live price
@@ -168,12 +168,12 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
       )}
 
       {catchUp && (
-        <div className="flex gap-2.5 rounded-xl border border-sky-500/25 bg-sky-500/[0.07] px-3.5 py-3">
+        <div className="flex gap-2.5 rounded-xl border border-edge bg-panel-hi px-3.5 py-3">
           <span aria-hidden className="text-base leading-none">
             ⏱
           </span>
-          <div className="text-xs leading-relaxed text-sky-100/85">
-            <strong className="font-semibold text-sky-100">
+          <div className="text-xs leading-relaxed text-ink-dim">
+            <strong className="font-semibold text-ink">
               That {percent(catchUp.pct!)} is a catch-up, not a spike.
             </strong>{" "}
             The price sat at {money(catchUp.from)} for {catchUp.flatDaysBefore}{" "}
@@ -186,14 +186,14 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-white/40">
+        <div className="rounded-xl border border-edge bg-panel p-4">
+          <div className="text-xs text-ink-faint">
             What people paid{s.label !== "Normal" ? ` · ${s.label}` : ""}
           </div>
-          <div className="mt-0.5 text-3xl font-semibold tabular-nums text-white">
+          <div className="mt-0.5 text-3xl font-semibold tabular-nums text-ink">
             {cur != null ? money(cur) : "N/A"}
           </div>
-          <div className="mt-1 text-[11px] leading-snug text-white/35">
+          <div className="mt-1 text-[11px] leading-snug text-ink-faint">
             {cur != null
               ? s.staleDays === 0
                 ? "someone bought one today at this price"
@@ -204,14 +204,14 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="text-xs text-white/40">What sellers want today</div>
-          <div className="mt-0.5 text-2xl font-semibold tabular-nums text-white">
+        <div className="rounded-xl border border-edge bg-panel p-4">
+          <div className="text-xs text-ink-faint">What sellers want today</div>
+          <div className="mt-0.5 text-2xl font-semibold tabular-nums text-ink">
             {latest?.low != null && latest?.high != null
               ? `${money(latest.low)} – ${money(latest.high)}`
               : "—"}
           </div>
-          <div className="mt-1 text-[11px] leading-snug text-white/35">
+          <div className="mt-1 text-[11px] leading-snug text-ink-faint">
             {latest?.low != null
               ? `you could buy one right now for ${money(latest.low)}`
               : "nothing listed for sale right now"}
@@ -219,7 +219,7 @@ export function CardPriceHeadline({ s }: { s: SeriesStats }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="rounded-xl border border-edge bg-panel p-4">
         <RangeBar s={s} />
       </div>
     </div>
@@ -234,28 +234,28 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="mb-1 text-sm font-medium text-white/70">
+        <div className="mb-1 text-sm font-medium text-ink-dim">
           How the price has moved
         </div>
-        <p className="mb-2.5 text-[11px] text-white/35">
+        <p className="mb-2.5 text-[11px] text-ink-faint">
           Comparing what people paid today against what they paid back then.
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {s.changes.map((c) => (
             <div
               key={c.label}
-              className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5"
+              className="rounded-lg border border-edge bg-panel/50 px-3 py-2.5"
             >
-              <div className="text-[11px] leading-snug text-white/40">{c.label}</div>
+              <div className="text-[11px] leading-snug text-ink-faint">{c.label}</div>
               <div
                 className={`mt-1 text-sm font-semibold tabular-nums ${
                   c.pct == null
-                    ? "text-white/30"
+                    ? "text-ink-faint/70"
                     : c.pct > 0
-                      ? "text-emerald-400"
+                      ? "text-up-bright"
                       : c.pct < 0
-                        ? "text-rose-400"
-                        : "text-white/60"
+                        ? "text-down-bright"
+                        : "text-ink-dim"
                 }`}
               >
                 {c.pct == null
@@ -265,7 +265,7 @@ export function CardPriceFacts({ s }: { s: SeriesStats }) {
                     : `${c.pct > 0 ? "up" : "down"} ${percentPlain(c.pct)}`}
               </div>
               {c.from != null && (
-                <div className="mt-0.5 text-[11px] leading-snug text-white/35">
+                <div className="mt-0.5 text-[11px] leading-snug text-ink-faint">
                   was {money(c.from)}
                 </div>
               )}

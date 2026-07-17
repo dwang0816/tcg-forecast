@@ -52,9 +52,9 @@ export default async function MissingPicturesPage({
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Cards without <span className="text-white/50">pictures</span>
+          Cards without <span className="text-ink-dim">pictures</span>
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/45">
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-faint">
           TCGplayer never photographed some sets — whole Japanese ones from 2010.
           Where we can, we fall back to another printing from the same set, or a
           photo from a live eBay listing. These are the ones left. We&apos;d rather
@@ -64,7 +64,7 @@ export default async function MissingPicturesPage({
 
       {/* Filters, matching the tab pattern used everywhere else on the site. */}
       <div className="flex flex-wrap items-center gap-4">
-        <nav className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+        <nav className="flex gap-1 rounded-xl border border-edge bg-panel p-1">
           <Tab href={href({ game: null })} active={!game}>
             All games
           </Tab>
@@ -74,7 +74,7 @@ export default async function MissingPicturesPage({
             </Tab>
           ))}
         </nav>
-        <nav className="flex gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+        <nav className="flex gap-1 rounded-xl border border-edge bg-panel p-1">
           <Tab href={href({ show: "tracked" })} active={tracked}>
             Tracked
           </Tab>
@@ -122,8 +122,8 @@ function Tab({
       aria-current={active ? "page" : undefined}
       className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
         active
-          ? "bg-white/10 text-white"
-          : "text-white/50 hover:bg-white/5 hover:text-white/80"
+          ? "bg-panel-hi text-ink"
+          : "text-ink-dim hover:bg-panel hover:text-ink"
       }`}
     >
       {children}
@@ -175,8 +175,8 @@ async function Gaps({
         />
       </div>
 
-      <p className="text-xs leading-relaxed text-white/35">
-        A card with <strong className="font-medium text-white/50">no card number</strong>{" "}
+      <p className="text-xs leading-relaxed text-ink-faint">
+        A card with <strong className="font-medium text-ink-dim">no card number</strong>{" "}
         is never matched against eBay automatically: there&apos;s nothing specific
         enough to anchor on, and a guess from the name alone puts the wrong card&apos;s
         photo on the page. Sealed products have no card number by nature, which is why
@@ -185,14 +185,14 @@ async function Gaps({
       </p>
 
       {term && (
-        <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-2">
-          <h2 className="text-sm font-medium text-white/70">
+        <div className="flex items-baseline justify-between gap-3 border-b border-edge pb-2">
+          <h2 className="text-sm font-medium text-ink-dim">
             {total.toLocaleString()} card{total === 1 ? "" : "s"} without a picture
-            match <span className="text-white">&ldquo;{term}&rdquo;</span>
+            match <span className="text-ink">&ldquo;{term}&rdquo;</span>
           </h2>
           <Link
             href={clearHref}
-            className="shrink-0 text-xs text-white/40 hover:text-white/80"
+            className="shrink-0 text-xs text-ink-faint hover:text-ink"
           >
             Clear search
           </Link>
@@ -200,14 +200,14 @@ async function Gaps({
       )}
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center text-sm text-white/40">
+        <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-10 text-center text-sm text-ink-faint">
           {/* The header above already says nothing matched, so this only has to
               explain why and what to do about it. */}
           {term ? (
             <>
               Every word has to appear somewhere on the card. Try just the name, the
               set, or the card number — or{" "}
-              <Link href={clearHref} className="text-white/70 underline hover:text-white">
+              <Link href={clearHref} className="text-ink-dim underline hover:text-ink">
                 browse all of them
               </Link>
               .
@@ -218,9 +218,9 @@ async function Gaps({
         </p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
+          <div className="overflow-x-auto rounded-xl border border-edge">
             <table className="w-full text-left text-sm">
-              <thead className="bg-white/[0.04] text-[11px] uppercase tracking-wide text-white/40">
+              <thead className="bg-panel text-[11px] uppercase tracking-wide text-ink-faint">
                 <tr>
                   <th className="px-3 py-2.5 font-medium">Number</th>
                   <th className="px-3 py-2.5 font-medium">Card</th>
@@ -235,44 +235,44 @@ async function Gaps({
                   return (
                     <tr
                       key={r.productId}
-                      className="border-t border-white/5 transition-colors hover:bg-white/[0.03]"
+                      className="border-t border-edge transition-colors hover:bg-panel"
                     >
-                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-white/60">
-                        {r.number ?? <span className="text-white/20">—</span>}
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-dim">
+                        {r.number ?? <span className="text-ink-faint/50">—</span>}
                       </td>
                       <td className="px-3 py-2">
                         <Link
                           href={`/card/${r.productId}`}
-                          className="font-medium text-white/85 hover:text-white hover:underline"
+                          className="font-medium text-ink hover:text-ink hover:underline"
                         >
                           {r.name}
                         </Link>
                         {!r.tracked && (
-                          <span className="ml-1.5 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/35">
+                          <span className="ml-1.5 rounded border border-edge px-1.5 py-0.5 text-[10px] text-ink-faint">
                             untracked
                           </span>
                         )}
-                        <div className="mt-0.5 text-xs text-white/35">
+                        <div className="mt-0.5 text-xs text-ink-faint">
                           {g && <span className={g.accentText}>{g.name}</span>}
                           {r.language === "JP" ? " JP" : ""} · {r.groupName}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-white/40">
+                      <td className="px-3 py-2 text-xs text-ink-faint">
                         {r.rarity ?? "—"}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-white/70">
+                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink-dim">
                         {r.value != null ? money(r.value) : "—"}
                         {r.value != null && !r.confirmed && (
-                          <div className="text-[10px] text-white/30">asking</div>
+                          <div className="text-[10px] text-ink-faint/70">asking</div>
                         )}
                       </td>
                       <td className="px-3 py-2">
                         {r.number == null ? (
-                          <span className="whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] text-amber-400/90">
+                          <span className="whitespace-nowrap rounded-full border border-gold/40 bg-gold/[0.08] px-2 py-0.5 text-[11px] text-gold/90">
                             no card number
                           </span>
                         ) : (
-                          <span className="whitespace-nowrap rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/40">
+                          <span className="whitespace-nowrap rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-faint">
                             no eBay match
                           </span>
                         )}
@@ -283,7 +283,7 @@ async function Gaps({
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-white/35">
+          <p className="text-xs text-ink-faint">
             {rows.length < total
               ? `Showing the ${rows.length} most valuable of ${total.toLocaleString()}${term ? " matches" : ""}.`
               : `${rows.length.toLocaleString()} ${rows.length === 1 ? "card" : "cards"}, most valuable first.`}
@@ -311,16 +311,16 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+    <div className="rounded-lg border border-edge bg-panel/50 px-3 py-2.5">
       <div
         className={`text-xl font-semibold tabular-nums ${
-          accent ? "text-amber-400" : "text-white/85"
+          accent ? "text-gold" : "text-ink"
         }`}
       >
         {n.toLocaleString()}
       </div>
-      <div className="mt-0.5 text-[11px] font-medium text-white/50">{label}</div>
-      <div className="mt-0.5 text-[11px] leading-snug text-white/30">{hint}</div>
+      <div className="mt-0.5 text-[11px] font-medium text-ink-dim">{label}</div>
+      <div className="mt-0.5 text-[11px] leading-snug text-ink-faint/70">{hint}</div>
     </div>
   );
 }
@@ -330,11 +330,11 @@ function GapsSkeleton() {
     <div className="flex flex-col gap-5" aria-busy>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[74px] animate-pulse rounded-lg bg-white/[0.04]" />
+          <div key={i} className="h-[74px] animate-pulse rounded-lg bg-panel" />
         ))}
       </div>
-      <div className="h-3 w-full max-w-3xl animate-pulse rounded bg-white/[0.04]" />
-      <div className="h-96 animate-pulse rounded-xl bg-white/[0.03]" />
+      <div className="h-3 w-full max-w-3xl animate-pulse rounded bg-panel" />
+      <div className="h-96 animate-pulse rounded-xl bg-panel" />
     </div>
   );
 }

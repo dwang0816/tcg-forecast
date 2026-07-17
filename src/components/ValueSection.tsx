@@ -23,21 +23,23 @@ export function ValueSection({
     <section className="flex flex-col gap-3">
       <div
         className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b pb-2 ${
-          tone === "warning" ? "border-amber-500/25" : "border-white/10"
+          tone === "warning" ? "border-gold/30" : "border-edge"
         }`}
       >
         <h2
-          className={`text-lg font-semibold ${
-            tone === "warning" ? "text-amber-200/90" : ""
+          className={`font-display text-lg font-bold tracking-tight ${
+            tone === "warning" ? "text-gold-bright" : "text-ink"
           }`}
         >
           {title}
         </h2>
         {rows.length > 0 && (
-          <span className="text-xs text-white/40">top {rows.length}</span>
+          <span className="font-mono text-[11px] text-ink-faint">
+            top {rows.length}
+          </span>
         )}
         {subtitle && (
-          <p className="w-full text-xs text-white/40">{subtitle}</p>
+          <p className="w-full text-xs leading-relaxed text-ink-dim">{subtitle}</p>
         )}
       </div>
 
@@ -52,7 +54,7 @@ export function ValueSection({
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center text-sm text-white/40">
+        <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-8 text-center text-sm text-ink-dim">
           {emptyBody}
         </p>
       )}

@@ -5,6 +5,7 @@ import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { GameTag } from "@/components/GameTag";
 
 export interface CardTileProps {
   productId: number;
@@ -60,31 +61,27 @@ export function CardTile({
   return (
     <Link
       href={`/card/${productId}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
+      className="group flex flex-col overflow-hidden rounded-xl border border-edge bg-panel transition-colors hover:border-gold/40 hover:bg-panel-hi"
     >
-      <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
+      <div className="relative aspect-[5/7] overflow-hidden bg-graphite">
         <CardImage sources={sources} alt={name} />
 
-        <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white/80 backdrop-blur">
+        <span className="absolute left-2 top-2 rounded-md bg-graphite/80 px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-ink-dim backdrop-blur">
           #{rank}
         </span>
 
         {subTypeName && subTypeName !== "Normal" && (
-          <span className="absolute right-2 top-2 rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">
+          <span className="absolute right-2 top-2 rounded-md border border-gold/40 bg-graphite/80 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-gold-bright backdrop-blur">
             {subTypeName}
           </span>
         )}
 
         {showBadge && game && (
-          <span
-            className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
-          >
-            {game.name}
-          </span>
+          <GameTag game={game} size="sm" className="absolute bottom-2 left-2" />
         )}
         {listingPhoto && (
           <span
-            className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white/70 backdrop-blur"
+            className="absolute bottom-2 right-2 rounded bg-graphite/85 px-1.5 py-0.5 font-mono text-[9px] text-ink-faint backdrop-blur"
             title="No official art exists for this card — this is a photo from a live eBay listing."
           >
             listing photo
@@ -93,7 +90,7 @@ export function CardTile({
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3">
-        <div className="line-clamp-2 text-sm font-medium leading-snug text-white/90">
+        <div className="line-clamp-2 font-display text-sm font-medium leading-snug text-ink">
           {name}
         </div>
         <CardIdentity number={number} setCode={setCode} rarity={rarity} groupName={groupName} />
@@ -103,14 +100,21 @@ export function CardTile({
           </div>
         )}
 
-        <div className="mt-auto flex items-end justify-between pt-2">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <span className="flex flex-col">
-            <span className="text-base font-semibold tabular-nums text-white">
+            {/* The price wears its own direction: green if this card is up, red
+                if it's down. Falls back to plain ink rather than a guess when
+                there's no change to read — no arrow, no color. */}
+            <span
+              className={`font-mono text-base font-semibold tabular-nums ${
+                change ? (up ? "text-up-bright" : "text-down-bright") : "text-ink"
+              }`}
+            >
               {money(price)}
             </span>
             {priceType === "listing" && (
               <span
-                className="text-[9px] font-medium uppercase tracking-wide text-amber-400/80"
+                className="font-mono text-[9px] uppercase tracking-wide text-ink-faint"
                 title="TCGplayer has no confirmed market price for this card — this is a current seller asking price."
               >
                 asking · no market
@@ -120,13 +124,15 @@ export function CardTile({
 
           {change && (
             <span
-              className={`flex flex-col items-end rounded-md px-2 py-1 text-right text-xs font-semibold tabular-nums ${
+              className={`flex flex-col items-end rounded-md border px-2 py-1 text-right font-mono text-xs font-semibold tabular-nums ${
                 up
-                  ? "bg-emerald-500/15 text-emerald-400"
-                  : "bg-rose-500/15 text-rose-400"
+                  ? "border-up/40 bg-up/10 text-up-bright"
+                  : "border-down/40 bg-down/10 text-down-bright"
               }`}
             >
-              <span>{percent(change.pct)}</span>
+              <span>
+                {up ? "▲" : "▼"} {percent(change.pct)}
+              </span>
               <span className="text-[10px] font-normal opacity-70">
                 {signedMoney(change.abs)}
               </span>

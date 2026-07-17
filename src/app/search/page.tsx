@@ -41,7 +41,7 @@ export default async function SearchPage({
 
   const chip = (active: boolean) =>
     `rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-      active ? "bg-white text-black" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+      active ? "bg-white text-black" : "bg-panel text-ink-dim hover:bg-panel-hi hover:text-ink"
     }`;
 
   const total = data?.total ?? 0;
@@ -51,7 +51,7 @@ export default async function SearchPage({
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Look up a card</h1>
-        <p className="mt-1 text-sm text-white/45">
+        <p className="mt-1 text-sm text-ink-faint">
           Find any single card or sealed product to see its price, price history
           and card details. Search by anything on the card — name, set, rarity or
           number — and the words can come from different fields: &ldquo;cleffa
@@ -64,7 +64,7 @@ export default async function SearchPage({
       {/* One filter row above everything it scopes. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs uppercase tracking-wide text-white/30">Game</span>
+          <span className="text-xs uppercase tracking-wide text-ink-faint/70">Game</span>
           <Link href={href({ game: undefined, page: undefined })} className={chip(!game)}>All</Link>
           {GAMES.map((g) => (
             <Link key={g.slug} href={href({ game: g.slug, page: undefined })} className={chip(game === g.slug)}>
@@ -73,13 +73,13 @@ export default async function SearchPage({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs uppercase tracking-wide text-white/30">Type</span>
+          <span className="text-xs uppercase tracking-wide text-ink-faint/70">Type</span>
           <Link href={href({ kind: undefined, page: undefined })} className={chip(!kind)}>All</Link>
           <Link href={href({ kind: "single", page: undefined })} className={chip(kind === "single")}>Singles</Link>
           <Link href={href({ kind: "sealed", page: undefined })} className={chip(kind === "sealed")}>Sealed</Link>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs uppercase tracking-wide text-white/30">Language</span>
+          <span className="text-xs uppercase tracking-wide text-ink-faint/70">Language</span>
           <Link href={href({ lang: undefined, page: undefined })} className={chip(!language)}>All</Link>
           <Link href={href({ lang: "EN", page: undefined })} className={chip(language === "EN")}>EN</Link>
           <Link href={href({ lang: "JP", page: undefined })} className={chip(language === "JP")}>JP</Link>
@@ -89,7 +89,7 @@ export default async function SearchPage({
       {error && <DbErrorBanner error={error} />}
 
       {!q && (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-12 text-center text-sm text-white/40">
+        <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-12 text-center text-sm text-ink-faint">
           Search all 71,000+ cards. Mix any keywords you like — card name, set,
           rarity, number — e.g. &ldquo;cleffa obsidian&rdquo; or &ldquo;luffy manga&rdquo;.
         </p>
@@ -97,28 +97,28 @@ export default async function SearchPage({
 
       {q && data && (
         <>
-          <div className="flex items-baseline justify-between border-b border-white/10 pb-2">
-            <h2 className="text-sm font-medium text-white/70">
+          <div className="flex items-baseline justify-between border-b border-edge pb-2">
+            <h2 className="text-sm font-medium text-ink-dim">
               {data.fuzzy ? (
                 <>
                   No exact match for{" "}
-                  <span className="text-white">&ldquo;{q}&rdquo;</span> — showing{" "}
+                  <span className="text-ink">&ldquo;{q}&rdquo;</span> — showing{" "}
                   {total} similar
                 </>
               ) : (
                 <>
                   {total.toLocaleString()} result{total === 1 ? "" : "s"} for{" "}
-                  <span className="text-white">&ldquo;{q}&rdquo;</span>
+                  <span className="text-ink">&ldquo;{q}&rdquo;</span>
                 </>
               )}
             </h2>
             {pages > 1 && (
-              <span className="text-xs text-white/40">page {page} of {pages}</span>
+              <span className="text-xs text-ink-faint">page {page} of {pages}</span>
             )}
           </div>
 
           {data.rows.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-12 text-center text-sm text-white/40">
+            <p className="rounded-xl border border-dashed border-edge bg-panel/50 px-4 py-12 text-center text-sm text-ink-faint">
               Nothing matched. Try a shorter name, or the card number (e.g. OP01-024).
             </p>
           ) : (

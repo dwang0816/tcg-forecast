@@ -5,6 +5,7 @@ import { cardImageSources, hasOfficialArt } from "@/lib/images";
 import { CardImage } from "@/components/CardImage";
 import { CardIdentity } from "@/components/CardIdentity";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
+import { GameTag } from "@/components/GameTag";
 import { ValuableRow } from "@/lib/queries";
 
 /**
@@ -28,30 +29,24 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
   return (
     <Link
       href={`/card/${row.productId}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
+      className="group flex flex-col overflow-hidden rounded-xl border border-edge bg-panel transition-colors hover:border-gold/40 hover:bg-panel-hi"
     >
-      <div className="relative aspect-[5/7] overflow-hidden bg-black/30">
+      <div className="relative aspect-[5/7] overflow-hidden bg-graphite">
         <CardImage sources={sources} alt={row.name} />
         {rank != null && (
-          <span className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white/80 backdrop-blur">
+          <span className="absolute left-2 top-2 rounded-md bg-graphite/80 px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-ink-dim backdrop-blur">
             #{rank}
           </span>
         )}
         {row.subTypeName && row.subTypeName !== "Normal" && (
-          <span className="absolute right-2 top-2 rounded-md bg-sky-500/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">
+          <span className="absolute right-2 top-2 rounded-md border border-gold/40 bg-graphite/80 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-gold-bright backdrop-blur">
             {row.subTypeName}
           </span>
         )}
-        {game && (
-          <span
-            className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${game.accent}`}
-          >
-            {game.name}
-          </span>
-        )}
+        {game && <GameTag game={game} size="sm" className="absolute bottom-2 left-2" />}
         {listingPhoto && (
           <span
-            className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white/70 backdrop-blur"
+            className="absolute bottom-2 right-2 rounded bg-graphite/85 px-1.5 py-0.5 font-mono text-[9px] text-ink-faint backdrop-blur"
             title="No official art exists for this card — this is a photo from a live eBay listing."
           >
             listing photo
@@ -61,7 +56,7 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
 
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div>
-          <div className="line-clamp-2 text-sm font-medium leading-snug text-white/90">
+          <div className="line-clamp-2 font-display text-sm font-medium leading-snug text-ink">
             {row.name}
           </div>
           <div className="mt-0.5">
@@ -77,7 +72,7 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
           </div>
         </div>
 
-        <div className="mt-auto flex flex-col gap-1.5 rounded-lg bg-black/20 p-2.5 text-xs">
+        <div className="mt-auto flex flex-col gap-1.5 rounded-lg border border-edge/60 bg-graphite p-2.5 text-xs">
           <PriceRow
             label="TCG market"
             value={row.marketPrice != null ? money(row.marketPrice) : "N/A"}
@@ -89,21 +84,19 @@ export function ValueCard({ row, rank }: { row: ValuableRow; rank?: number }) {
             value={row.listingPrice != null ? money(row.listingPrice) : "N/A"}
           />
 
-          <div className="my-0.5 border-t border-white/10" />
+          <div className="my-0.5 border-t border-edge" />
 
           <PriceRow label="eBay avg (last 6)" value="—" faded />
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-white/35">eBay last 10 sold</span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-ink-faint/70">
+              eBay last 10 sold
+            </span>
             <div className="flex flex-wrap gap-1">
               {Array.from({ length: 10 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="h-4 w-7 rounded bg-white/[0.04]"
-                  aria-hidden
-                />
+                <span key={i} className="h-4 w-7 rounded bg-panel-hi" aria-hidden />
               ))}
             </div>
-            <span className="text-[10px] italic text-white/25">
+            <span className="font-mono text-[9px] text-ink-faint/60">
               sold data coming soon
             </span>
           </div>
@@ -126,14 +119,18 @@ function PriceRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className={faded ? "text-white/30" : "text-white/45"}>{label}</span>
       <span
-        className={`tabular-nums ${
+        className={`font-mono text-[11px] ${faded ? "text-ink-faint/60" : "text-ink-faint"}`}
+      >
+        {label}
+      </span>
+      <span
+        className={`font-mono tabular-nums ${
           emphasis
-            ? "text-sm font-semibold text-white"
+            ? "text-sm font-semibold text-gold-bright"
             : faded
-              ? "text-white/30"
-              : "text-white/80"
+              ? "text-ink-faint/60"
+              : "text-ink-dim"
         }`}
       >
         {value}

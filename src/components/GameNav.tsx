@@ -3,39 +3,43 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GAMES } from "@/lib/games";
+import { Mark, Wordmark } from "@/components/Logo";
 
 export function GameNav() {
   const pathname = usePathname();
 
-  const links = [
-    { href: "/", label: "Home", slug: "" },
-    ...GAMES.map((g) => ({ href: `/${g.slug}`, label: g.name, slug: g.slug })),
-  ];
-
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#07070a]/80 backdrop-blur">
-      <nav className="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 py-3">
-        <Link href="/" className="mr-3 flex items-center gap-2">
-          <span className="text-lg">📈</span>
-          <span className="text-sm font-semibold tracking-tight text-white">
-            TCG Forecast
-          </span>
+    <header className="sticky top-0 z-20 border-b border-edge bg-graphite/85 backdrop-blur">
+      <nav className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-3">
+        <Link href="/" className="mr-2 flex shrink-0 items-center gap-2.5">
+          <Mark size={26} />
+          <Wordmark className="text-base" />
         </Link>
 
+        {/* The accent dot rides in the tab itself: this is the only place the
+            games appear side by side, so it's where the color coding has to be
+            learnable. */}
         <div className="flex flex-1 items-center gap-1 overflow-x-auto">
-          {links.slice(1).map((link) => {
-            const active = pathname === link.href;
+          {GAMES.map((game) => {
+            const active = pathname === `/${game.slug}`;
             return (
               <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                key={game.slug}
+                href={`/${game.slug}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-white/10 text-white"
-                    : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                    ? "bg-panel-hi text-ink"
+                    : "text-ink-faint hover:bg-panel hover:text-ink-dim"
                 }`}
               >
-                {link.label}
+                <span
+                  aria-hidden
+                  className={`h-2 w-2 shrink-0 rounded-full transition-opacity ${game.accent} ${
+                    active ? "opacity-100" : "opacity-50"
+                  }`}
+                />
+                {game.name}
               </Link>
             );
           })}
@@ -47,10 +51,10 @@ export function GameNav() {
           <Link
             href="/missing-pictures"
             aria-current={pathname === "/missing-pictures" ? "page" : undefined}
-            className={`hidden rounded-full px-3 py-1.5 text-sm font-medium transition-colors md:inline ${
+            className={`hidden rounded-full px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider transition-colors md:inline ${
               pathname === "/missing-pictures"
-                ? "bg-white/10 text-white"
-                : "text-white/40 hover:bg-white/5 hover:text-white/70"
+                ? "bg-panel-hi text-ink-dim"
+                : "text-ink-faint/70 hover:bg-panel hover:text-ink-faint"
             }`}
           >
             Missing pictures
@@ -64,8 +68,8 @@ export function GameNav() {
             aria-current={pathname === "/search" ? "page" : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               pathname === "/search"
-                ? "border-white/25 bg-white/10 text-white"
-                : "border-white/10 text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
+                ? "border-gold/50 bg-gold/10 text-gold-bright"
+                : "border-edge text-ink-dim hover:border-gold/40 hover:bg-gold/[0.06] hover:text-gold-bright"
             }`}
           >
             <span aria-hidden className="text-base leading-none">

@@ -36,19 +36,19 @@ export function CardIdentity({
   return (
     <div className="flex flex-col gap-0.5">
       {(lead || rarity) && (
-        <div className="flex flex-wrap items-center gap-x-1.5 text-xs leading-snug">
+        <div className="flex flex-wrap items-center gap-x-1.5 font-mono text-[11px] leading-snug">
           {lead && (
-            <span className="font-medium tabular-nums text-white/65">{lead}</span>
+            <span className="font-medium tabular-nums text-ink-dim">{lead}</span>
           )}
           {lead && rarity && (
-            <span aria-hidden className="text-white/20">
+            <span aria-hidden className="text-ink-faint/40">
               ·
             </span>
           )}
-          {rarity && <span className="text-white/45">{rarity}</span>}
+          {rarity && <span className="text-ink-faint">{rarity}</span>}
         </div>
       )}
-      <div className="line-clamp-2 text-[11px] leading-snug text-white/35">
+      <div className="line-clamp-2 text-[11px] leading-snug text-ink-faint/70">
         {groupName}
       </div>
     </div>

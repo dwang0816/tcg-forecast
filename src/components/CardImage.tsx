@@ -13,9 +13,9 @@ export function CardImage({ sources, alt }: { sources: string[]; alt: string }) 
 
   if (!src) {
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-white/[0.04] to-transparent p-3 text-center">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br from-panel-hi to-transparent p-3 text-center">
         <span className="text-2xl opacity-30">🃏</span>
-        <span className="line-clamp-3 text-[10px] leading-tight text-white/40">
+        <span className="line-clamp-3 font-mono text-[10px] leading-tight text-ink-faint">
           {alt}
         </span>
       </div>

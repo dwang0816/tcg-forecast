@@ -29,7 +29,7 @@ export function SearchBox({
           <input key={k} type="hidden" name={k} value={v} />
         ))}
       <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gold/60">
           ⌕
         </span>
         <input
@@ -44,7 +44,7 @@ export function SearchBox({
               : "Search by card name or number — e.g. Charizard, OP01-024")
           }
           aria-label="Search cards"
-          className={`w-full rounded-lg border border-white/10 bg-white/[0.04] pl-8 pr-3 text-white placeholder:text-white/30 focus:border-white/25 focus:outline-none ${
+          className={`w-full rounded-lg border border-edge bg-panel pl-8 pr-3 text-ink transition-colors placeholder:text-ink-faint/70 focus:border-gold/50 focus:bg-panel-hi focus:outline-none ${
             compact ? "h-8 text-xs sm:w-56" : "h-11 text-sm"
           }`}
         />
