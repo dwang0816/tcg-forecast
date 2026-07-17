@@ -61,6 +61,32 @@ export const cards = pgTable(
     lowPrice: doublePrecision("low_price"),
     highPrice: doublePrecision("high_price"),
     priceDate: date("price_date"),
+
+    /**
+     * A photo of the card from a live eBay listing, for the ~3% of tracked cards
+     * TCGplayer has no art for. The URL only — the photograph is the seller's, so
+     * it's shown captioned and linked, never copied. See lib/ebay.ts.
+     *
+     * Only ever a fallback: cardImageSources tries real art first, and ingest
+     * clears these the moment TCGplayer publishes one.
+     */
+    ebayPhotoUrl: text("ebay_photo_url"),
+    ebayListingUrl: text("ebay_listing_url"),
+    ebayListingTitle: text("ebay_listing_title"),
+    ebayListingPrice: doublePrecision("ebay_listing_price"),
+    /** When we last asked eBay. Non-null with a null url means "asked, found nothing". */
+    ebayPhotoAt: timestamp("ebay_photo_at"),
+
+    /** Human verdict on that photo from /admin/photos: 'good' | 'bad' | null. */
+    photoVerdict: text("photo_verdict"),
+    photoReviewedAt: timestamp("photo_reviewed_at"),
+    /**
+     * Photos a human rejected. Load-bearing: rejecting clears ebay_photo_url, so
+     * without this the next photo run would rediscover the same listing and put
+     * the same bad picture back.
+     */
+    rejectedPhotoUrls: text("rejected_photo_urls").array(),
+
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [

@@ -388,6 +388,34 @@ export async function ingestGame(
           lowPrice: sql`excluded.low_price`,
           highPrice: sql`excluded.high_price`,
           priceDate: sql`excluded.price_date`,
+
+          // Official art supersedes a borrowed one. Every run re-reads TCGplayer's
+          // imageCount, so the day they finally photograph one of these cards, the
+          // eBay stand-in is dropped here rather than lingering.
+          //
+          // The site already PREFERS official art (cardImageSources tries it first
+          // and hasOfficialArt suppresses the caption), so this changes no pixels.
+          // What it fixes is everything downstream of the row still being there:
+          // the review queue keeps asking for a verdict on a picture nobody can
+          // see any more, and the "cards without pictures" page has to keep
+          // reasoning about a photo that's now irrelevant.
+          //
+          // It's also a backstop on us. If a photo was approved by mistake — a
+          // wrong printing that looked right at a glance — real art arriving
+          // silently corrects it, with no dependence on anyone noticing.
+          //
+          // rejected_photo_urls deliberately survives: if TCGplayer's art ever
+          // vanishes again and we re-source from eBay, the listings a human
+          // already threw out must stay thrown out.
+          ebayPhotoUrl: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.ebayPhotoUrl} END`,
+          ebayListingUrl: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.ebayListingUrl} END`,
+          ebayListingTitle: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.ebayListingTitle} END`,
+          ebayListingPrice: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.ebayListingPrice} END`,
+          ebayPhotoAt: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.ebayPhotoAt} END`,
+          // The verdict belonged to a photo that no longer exists.
+          photoVerdict: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.photoVerdict} END`,
+          photoReviewedAt: sql`CASE WHEN excluded.image_url IS NOT NULL THEN NULL ELSE ${cards.photoReviewedAt} END`,
+
           updatedAt: sql`now()`,
         },
       });
