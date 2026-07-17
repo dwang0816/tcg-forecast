@@ -95,10 +95,10 @@ export async function reject(productId: number) {
  * bad, and it left the card blank until someone remembered to run
  * `pnpm run photos` from a laptop. A rejection was a request nobody answered.
  *
- * Blacklists the current photo first, then searches with that blacklist applied —
- * so it physically cannot hand back the picture just rejected. Returns the new
- * photo for the caller to swap in place, or null when eBay has nothing else, in
- * which case the card is left blank and marked bad.
+ * Excludes the photo on screen from its own search, so it physically cannot hand
+ * back the picture you're looking at. Returns the new photo for the caller to
+ * swap in place, or null when eBay has nothing else — and null means the card is
+ * untouched, not blanked. Nothing is written unless there's a replacement.
  */
 export async function replacePhoto(productId: number): Promise<{
   photoUrl: string;
@@ -126,28 +126,12 @@ export async function replacePhoto(productId: number): Promise<{
   const db = getDb();
   const rowsOf = <T,>(r: unknown) => ((r as { rows?: T[] }).rows ?? []);
 
-  // Blacklist what's on screen now. Doing this BEFORE the search is what makes
-  // the reroll honest: findListingPhoto skips blacklisted urls, so it must find
-  // something genuinely different or nothing at all.
-  //
-  // A reroll is a judgement too — you looked at that photo and turned it down —
-  // so it counts, whether or not the search that follows finds anything.
-  await db.execute(sql`
-    UPDATE cards SET
-      rejected_photo_urls = CASE
-        WHEN ebay_photo_url IS NULL THEN rejected_photo_urls
-        ELSE array_append(COALESCE(rejected_photo_urls, '{}'), ebay_photo_url)
-      END,
-      photo_review_count = photo_review_count + 1
-    WHERE product_id = ${productId}
-  `);
-
   const res = await db.execute(sql`
     SELECT product_id, game, name, group_name, number, language,
            (SELECT count(*) FROM cards o
              WHERE o.game = cards.game AND o.language = cards.language
                AND o.name = cards.name AND o.number = cards.number) > 1 AS ambiguous,
-           rejected_photo_urls, photo_review_count
+           rejected_photo_urls, ebay_photo_url, photo_review_count
     FROM cards WHERE product_id = ${productId}
   `);
   const c = rowsOf<{
@@ -158,9 +142,18 @@ export async function replacePhoto(productId: number): Promise<{
     language: string;
     ambiguous: boolean;
     rejected_photo_urls: string[] | null;
+    ebay_photo_url: string | null;
     photo_review_count: number;
   }>(res)[0];
   if (!c) throw new Error("Card not found");
+
+  // Exclude the photo on screen IN MEMORY rather than blacklisting it first.
+  // The guarantee is the same — findListingPhoto can't hand back a url in this
+  // set, so it finds something genuinely different or nothing — but the database
+  // is untouched until there's actually a replacement to write.
+  const exclude = [...(c.rejected_photo_urls ?? []), c.ebay_photo_url].filter(
+    (u): u is string => Boolean(u),
+  );
 
   const photo = await findListingPhoto(token, {
     game: c.game,
@@ -169,20 +162,36 @@ export async function replacePhoto(productId: number): Promise<{
     groupName: c.group_name,
     language: c.language,
     ambiguous: c.ambiguous,
-    rejectedPhotoUrls: c.rejected_photo_urls,
+    rejectedPhotoUrls: exclude,
   });
+
+  // Nothing else exists. Leave the card exactly as it was and say so.
+  //
+  // This used to blacklist the photo, blank the card and mark it bad, which
+  // turned "show me another" into "destroy the only one I had": the card left
+  // the queue, showed nothing on the site, and the picture couldn't come back,
+  // because the blacklist is what stops the photo job re-finding it. Asking to
+  // see alternatives is not the same as saying the current photo is bad, and
+  // a mediocre photo beats an empty frame. No replacement, no change.
+  if (!photo) return null;
 
   await db.execute(sql`
     UPDATE cards SET
-      ebay_photo_url     = ${photo?.imageUrl ?? null},
-      ebay_listing_url   = ${photo?.listingUrl ?? null},
-      ebay_listing_title = ${photo?.title ?? null},
-      ebay_listing_price = ${photo?.price ?? null},
+      -- Now it's earned: there's a better option, so the old one is out. The
+      -- right-hand side sees the pre-UPDATE row, so this appends the OLD photo.
+      rejected_photo_urls = CASE
+        WHEN ebay_photo_url IS NULL THEN rejected_photo_urls
+        ELSE array_append(COALESCE(rejected_photo_urls, '{}'), ebay_photo_url)
+      END,
+      ebay_photo_url     = ${photo.imageUrl},
+      ebay_listing_url   = ${photo.listingUrl},
+      ebay_listing_title = ${photo.title},
+      ebay_listing_price = ${photo.price},
       ebay_photo_at      = now(),
-      -- A new photo is unjudged. Nothing found means the card is blank, which is
-      -- the same outcome as a plain rejection, so it's recorded as one.
-      photo_verdict      = ${photo ? null : "bad"},
-      photo_reviewed_at  = ${photo ? null : sql`now()`}
+      -- A new photo is unjudged, whatever the old one's verdict was.
+      photo_verdict      = NULL,
+      photo_reviewed_at  = NULL,
+      photo_review_count = photo_review_count + 1
     WHERE product_id = ${productId}
   `);
 
@@ -192,15 +201,13 @@ export async function replacePhoto(productId: number): Promise<{
   // stays on every list.
   revalidateTag(PRICES_TAG, "max");
 
-  return photo
-    ? {
-        photoUrl: photo.imageUrl,
-        listingUrl: photo.listingUrl,
-        listingTitle: photo.title,
-        listingPrice: photo.price,
-        reviewCount: c.photo_review_count,
-      }
-    : null;
+  return {
+    photoUrl: photo.imageUrl,
+    listingUrl: photo.listingUrl,
+    listingTitle: photo.title,
+    listingPrice: photo.price,
+    reviewCount: c.photo_review_count + 1,
+  };
 }
 
 /**

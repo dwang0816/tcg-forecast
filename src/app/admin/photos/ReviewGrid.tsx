@@ -124,8 +124,12 @@ export function ReviewGrid({
    *
    * NOT optimistic, unlike the verdicts: this one has to go to eBay and back, and
    * there's no sensible thing to show meanwhile except the truth. So the card
-   * stays put and says it's looking. When nothing else exists the card leaves,
-   * because a blank card with two verdict buttons is a question with no answer.
+   * stays put and says it's looking.
+   *
+   * When nothing else exists the card STILL stays put, holding the photo it had.
+   * It used to vanish, which read as a bug: the explanation rendered in a banner
+   * at the top of the grid, so anyone scrolled down judging cards just watched
+   * one evaporate. The answer belongs on the card you're looking at.
    */
   const reroll = (id: number) => {
     setHunting((h) => ({ ...h, [id]: true }));
@@ -139,9 +143,16 @@ export function ReviewGrid({
         const photo = await replacePhoto(id);
         if (photo) {
           setSwapped((s) => ({ ...s, [id]: photo }));
+          // A fresh photo is a fresh question, so any earlier "nothing else"
+          // note no longer applies.
+          setNoneLeft((n) => {
+            const next = { ...n };
+            delete next[id];
+            return next;
+          });
         } else {
-          // eBay had nothing else — the action already marked it bad.
-          setJudged((j) => ({ ...j, [id]: "bad" }));
+          // eBay has nothing else. The card is untouched — it keeps the photo
+          // it had — so it stays in the queue and just explains itself.
           setNoneLeft((n) => ({ ...n, [id]: true }));
         }
       } catch (e) {
@@ -160,10 +171,6 @@ export function ReviewGrid({
   };
 
   const visible = cards.filter((c) => !judged[c.productId]);
-  // A reroll that found nothing removes the card silently, which reads as a bug.
-  // Name the ones it happened to, so "it disappeared" becomes "eBay had one
-  // listing for it and you'd already seen it".
-  const gone = cards.filter((c) => noneLeft[c.productId]);
 
   // This session's tally. Deliberately counts verdicts YOU gave in this sitting
   // rather than the queue total: the queue barely moves in a batch of 24, so it
@@ -192,18 +199,6 @@ export function ReviewGrid({
             {visible.length} left in this batch
           </p>
         </div>
-      )}
-
-      {gone.length > 0 && (
-        <p className="rounded-lg border border-edge bg-panel-hi px-3 py-2 text-xs leading-relaxed text-ink-dim">
-          eBay had no other listing for{" "}
-          <strong className="font-semibold text-ink">
-            {gone.map((c) => c.name).join(", ")}
-          </strong>
-          . {gone.length === 1 ? "It's" : "They're"} marked bad and left blank —
-          Undo puts {gone.length === 1 ? "it" : "them"} back if a seller lists one
-          later.
-        </p>
       )}
 
       {visible.length === 0 && cards.length > 0 && (
@@ -309,6 +304,19 @@ export function ReviewGrid({
                 </p>
               )}
 
+              {/* Sits on the card, not in a banner up top: this is the answer to
+                  a click you made on THIS card, and it has to be where your eyes
+                  already are. */}
+              {noneLeft[c.productId] && !busy && (
+                <p className="rounded border border-gold/30 bg-gold/[0.07] px-2 py-1 text-[11px] leading-snug text-ink-dim">
+                  <strong className="font-semibold text-gold-bright">
+                    That&apos;s the only listing.
+                  </strong>{" "}
+                  eBay has nothing else for this card, so the photo above is
+                  still the best there is — judge it with ✓ or ✕.
+                </p>
+              )}
+
               <div className="mt-auto flex flex-col gap-2 pt-1">
                 {reviewed ? (
                   <button
@@ -347,17 +355,26 @@ export function ReviewGrid({
 
                   {/* Under the verdicts, because it's the third answer to "is
                       this photo any good?" — not "yes" or "no" but "show me a
-                      different one". Blacklists this photo and searches again,
-                      so the card never comes back wearing the same picture. */}
+                      different one". Goes dead once eBay has been exhausted:
+                      the same search can only return the same nothing, and a
+                      button that re-answers a settled question is a trap. */}
                   <button
                     onClick={() => reroll(c.productId)}
-                    disabled={busy || !c.photoUrl}
+                    disabled={busy || !c.photoUrl || Boolean(noneLeft[c.productId])}
                     aria-label={`Find a different photo for ${c.name}`}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge py-2 text-xs font-medium text-ink-faint transition-colors hover:border-ink-faint/40 hover:bg-panel-hi hover:text-ink-dim disabled:cursor-not-allowed disabled:opacity-40"
-                    title="Reject this photo and pull a different live listing right now"
+                    title={
+                      noneLeft[c.productId]
+                        ? "eBay has no other listing for this card — nothing left to find"
+                        : "Look for a different live listing right now. Your photo stays if there's nothing better."
+                    }
                   >
                     <span aria-hidden>⟳</span>
-                    {busy ? "Searching eBay…" : "Find new photo"}
+                    {busy
+                      ? "Searching eBay…"
+                      : noneLeft[c.productId]
+                        ? "No other listing"
+                        : "Find new photo"}
                   </button>
                   </>
                 )}
